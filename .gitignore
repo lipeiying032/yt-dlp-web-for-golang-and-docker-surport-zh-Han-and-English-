@@ -8,6 +8,7 @@ yt-dlp-web
 # Downloads & config (runtime data)
 /downloads/
 /config/
+/dist/
 
 # Go
 go.sum

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,9 +18,13 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
+
+//go:embed static/*
+var staticFS embed.FS
 
 func main() {
 	// CLI fallback: if any args given, pass straight to yt-dlp
@@ -87,11 +94,21 @@ func main() {
 	// API routes
 	api.RegisterRoutes(app)
 
-	// Static files (index.html etc.)
-	app.Static("/", cfg.StaticDir, fiber.Static{
-		Compress: true,
-		Index:    "index.html",
-	})
+	// Static files — use embedded FS by default, filesystem if STATIC_DIR is set
+	if os.Getenv("STATIC_DIR") != "" {
+		app.Static("/", cfg.StaticDir, fiber.Static{
+			Compress: true,
+			Index:    "index.html",
+		})
+	} else {
+		subFS, _ := fs.Sub(staticFS, "static")
+		app.Use("/", filesystem.New(filesystem.Config{
+			Root:         http.FS(subFS),
+			Browse:       false,
+			Index:        "index.html",
+			NotFoundFile: "index.html",
+		}))
+	}
 
 	// Graceful shutdown
 	go func() {

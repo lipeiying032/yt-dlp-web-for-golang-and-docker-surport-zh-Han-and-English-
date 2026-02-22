@@ -21,11 +21,44 @@ A lightweight, self-hosted web UI for [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 
 ## 🚀 Quick Start
 
+### Option 1: Download Pre-built Binary
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/lipeiying032/yt-dlp-web-for-golang-and-docker-surport-zh-Han-and-English-/releases):
+
+| Platform | Architecture | File |
+|---|---|---|
+| Windows | x64 (amd64) | `yt-dlp-web-windows-amd64.zip` |
+| Windows | x86 (32-bit) | `yt-dlp-web-windows-386.zip` |
+| Windows | ARM64 | `yt-dlp-web-windows-arm64.zip` |
+| macOS | Intel (amd64) | `yt-dlp-web-darwin-amd64.tar.gz` |
+| macOS | Apple Silicon | `yt-dlp-web-darwin-arm64.tar.gz` |
+
+**Prerequisites:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org/) must be installed and on your PATH.
+
 ```bash
-git clone https://github.com/<your-user>/yt-dlp-web.git
-cd yt-dlp-web
+# Extract and run (no installation needed)
+./yt-dlp-web          # macOS/Linux
+yt-dlp-web.exe        # Windows
+
+# Open http://localhost:8080
+```
+
+### Option 2: Docker
+
+```bash
+git clone https://github.com/lipeiying032/yt-dlp-web-for-golang-and-docker-surport-zh-Han-and-English-.git
+cd yt-dlp-web-for-golang-and-docker-surport-zh-Han-and-English-
 docker compose up -d
 # Open http://localhost:8080
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/lipeiying032/yt-dlp-web-for-golang-and-docker-surport-zh-Han-and-English-.git
+cd yt-dlp-web-for-golang-and-docker-surport-zh-Han-and-English-
+go build -ldflags="-s -w" -trimpath -o yt-dlp-web .
+./yt-dlp-web
 ```
 
 ## ⚙️ Environment Variables

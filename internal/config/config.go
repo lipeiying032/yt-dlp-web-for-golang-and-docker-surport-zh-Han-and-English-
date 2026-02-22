@@ -20,8 +20,8 @@ type Config struct {
 func Load() *Config {
 	cfg := &Config{
 		Port:          envOr("PORT", "8080"),
-		DownloadDir:   envOr("DOWNLOAD_DIR", "/app/downloads"),
-		ConfigDir:     envOr("CONFIG_DIR", "/app/config"),
+		DownloadDir:   envOr("DOWNLOAD_DIR", "./downloads"),
+		ConfigDir:     envOr("CONFIG_DIR", "./config"),
 		StaticDir:     envOr("STATIC_DIR", "./static"),
 		MaxConcurrent: envOrInt("MAX_CONCURRENT", 2),
 		YtDlpPath:     envOr("YTDLP_PATH", "yt-dlp"),
