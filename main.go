@@ -48,6 +48,17 @@ func main() {
 
 	// --- Web server mode ---
 	cfg := config.Load()
+
+	// Sanity check for yt-dlp existence to prevent silent failing downloads
+	if _, err := exec.LookPath(cfg.YtDlpPath); err != nil {
+		log.Printf("-----------------------------------------------------------------------------")
+		log.Printf("WARNING/FATAL: yt-dlp executable not found at '%s' or in system PATH!", cfg.YtDlpPath)
+		log.Printf("Please download yt-dlp and place it in the same directory as this web UI, or")
+		log.Printf("add yt-dlp to your system PATH. Downloads will fail until this is fixed.")
+		log.Printf("err: %v", err)
+		log.Printf("-----------------------------------------------------------------------------")
+	}
+
 	hub := handler.NewHub()
 
 	mgr := download.NewManager(cfg, func(t *download.Task) {

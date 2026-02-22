@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -18,12 +19,12 @@ type Broadcaster func(t *Task)
 
 // Manager owns the task map, worker pool, and yt-dlp execution.
 type Manager struct {
-	tasks  map[string]*Task
-	order  []string // insertion order for stable listing
-	mu     sync.RWMutex
-	queue  chan string // task IDs
-	cfg    *config.Config
-	bc     Broadcaster
+	tasks map[string]*Task
+	order []string // insertion order for stable listing
+	mu    sync.RWMutex
+	queue chan string // task IDs
+	cfg   *config.Config
+	bc    Broadcaster
 }
 
 // NewManager creates the manager and starts worker goroutines.
@@ -190,6 +191,17 @@ func (m *Manager) Delete(id string) error {
 		_ = os.Remove(t.Filename)
 		_ = os.Remove(t.Filename + ".part")
 		_ = os.Remove(t.Filename + ".ytdl")
+
+		// Also wipe any sibling artifacts (like info.json, descriptions, thumbnails, subtitles)
+		base := t.Filename
+		if ext := filepath.Ext(base); ext != "" {
+			base = base[:len(base)-len(ext)]
+		}
+		if matches, _ := filepath.Glob(base + "*"); len(matches) > 0 {
+			for _, match := range matches {
+				_ = os.Remove(match)
+			}
+		}
 	}
 	return nil
 }
@@ -222,6 +234,16 @@ func (m *Manager) ClearCompleted() int {
 			_ = os.Remove(t.Filename)
 			_ = os.Remove(t.Filename + ".part")
 			_ = os.Remove(t.Filename + ".ytdl")
+
+			base := t.Filename
+			if ext := filepath.Ext(base); ext != "" {
+				base = base[:len(base)-len(ext)]
+			}
+			if matches, _ := filepath.Glob(base + "*"); len(matches) > 0 {
+				for _, match := range matches {
+					_ = os.Remove(match)
+				}
+			}
 		}
 	}
 

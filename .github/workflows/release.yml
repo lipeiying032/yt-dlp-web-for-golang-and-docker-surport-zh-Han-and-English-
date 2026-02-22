@@ -80,19 +80,30 @@ jobs:
       - name: Build Go binaries as native libs
         env:
           CGO_ENABLED: '0'
+          GOOS: linux
         run: |
           go mod tidy
           
-          mkdir -p android/app/src/main/jniLibs/arm64-v8a
-          mkdir -p android/app/src/main/jniLibs/armeabi-v7a
-          mkdir -p android/app/src/main/jniLibs/x86_64
-          mkdir -p android/app/src/main/jniLibs/x86
+          # Map Go architectures to Android ABI names
+          declare -A ARCH_MAP=(
+            ["arm64"]="arm64-v8a"
+            ["arm"]="armeabi-v7a"
+            ["amd64"]="x86_64"
+            ["386"]="x86"
+          )
           
-          # Build all 4 Android-compatible architectures
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/arm64-v8a/libytdlpweb.so .
-          GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/armeabi-v7a/libytdlpweb.so .
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/x86_64/libytdlpweb.so .
-          GOOS=linux GOARCH=386 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/x86/libytdlpweb.so .
+          for arch in "${!ARCH_MAP[@]}"; do
+            abi="${ARCH_MAP[$arch]}"
+            mkdir -p "android/app/src/main/jniLibs/$abi"
+            
+            # Special case for 32-bit ARM
+            if [ "$arch" = "arm" ]; then
+              GOARCH=$arch GOARM=7 go build -ldflags="-s -w" -trimpath -o "android/app/src/main/jniLibs/$abi/libytdlpweb.so" .
+            else
+              GOARCH=$arch go build -ldflags="-s -w" -trimpath -o "android/app/src/main/jniLibs/$abi/libytdlpweb.so" .
+            fi
+            echo "Built native lib for $abi"
+          done
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3

@@ -27,6 +27,34 @@ func Load() *Config {
 		YtDlpPath:     envOr("YTDLP_PATH", "yt-dlp"),
 	}
 
+	// Try to find yt-dlp in the same directory as the executable, useful for portable zero-config setups
+	if cfg.YtDlpPath == "yt-dlp" {
+		if exePath, err := os.Executable(); err == nil {
+			importPath := func(name string) string {
+				// Get the directory of the executable
+				for i := len(exePath) - 1; i >= 0 && !os.IsPathSeparator(exePath[i]); i-- {
+					if i == 0 {
+						return name
+					}
+				}
+				// extract dir safely
+				dir := ""
+				for i := len(exePath) - 1; i >= 0; i-- {
+					if os.IsPathSeparator(exePath[i]) {
+						dir = exePath[:i]
+						break
+					}
+				}
+				return dir + string(os.PathSeparator) + name
+			}
+			if _, err := os.Stat(importPath("yt-dlp.exe")); err == nil {
+				cfg.YtDlpPath = importPath("yt-dlp.exe")
+			} else if _, err := os.Stat(importPath("yt-dlp")); err == nil {
+				cfg.YtDlpPath = importPath("yt-dlp")
+			}
+		}
+	}
+
 	_ = os.MkdirAll(cfg.DownloadDir, 0o755)
 	_ = os.MkdirAll(cfg.ConfigDir, 0o755)
 

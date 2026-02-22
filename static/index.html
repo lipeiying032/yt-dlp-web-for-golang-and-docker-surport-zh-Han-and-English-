@@ -414,6 +414,16 @@
                 </div>
             </template>
         </div>
+
+        <!-- Toast Container -->
+        <div class="toast toast-top toast-center z-50">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div class="alert fade-in shadow-xl"
+                    :class="{'alert-error': toast.type==='error', 'alert-success': toast.type==='success', 'alert-info': toast.type==='info'}">
+                    <span x-text="toast.msg"></span>
+                </div>
+            </template>
+        </div>
     </main>
 
     <footer class="text-center py-6 text-xs text-base-content/30">yt-dlp web — self-hosted</footer>
@@ -454,7 +464,8 @@
                 downloads: 'Downloads', clearDone: 'Clear done', emptyQueue: 'No downloads yet. Paste a URL above to start.',
                 status_queued: 'queued', status_running: 'running', status_completed: 'completed',
                 status_failed: 'failed', status_cancelled: 'cancelled', status_paused: 'paused',
-                pause: 'Pause', resume: 'Resume', cancelBtn: 'Cancel', retry: 'Retry', deleteBtn: 'Delete', logs: 'Logs'
+                pause: 'Pause', resume: 'Resume', cancelBtn: 'Cancel', retry: 'Retry', deleteBtn: 'Delete', logs: 'Logs',
+                taskAdded: 'Task added to queue'
             },
             zh: {
                 lightMode: '浅色模式', darkMode: '深色模式',
@@ -489,7 +500,8 @@
                 downloads: '下载队列', clearDone: '清除已完成', emptyQueue: '暂无下载任务，请在上方粘贴链接开始下载。',
                 status_queued: '排队中', status_running: '下载中', status_completed: '已完成',
                 status_failed: '失败', status_cancelled: '已取消', status_paused: '已暂停',
-                pause: '暂停', resume: '继续', cancelBtn: '取消', retry: '重试', deleteBtn: '删除', logs: '日志'
+                pause: '暂停', resume: '继续', cancelBtn: '取消', retry: '重试', deleteBtn: '删除', logs: '日志',
+                taskAdded: '任务已添加到队列'
             }
         };
 
@@ -559,8 +571,13 @@
                         const payload = { ...this.form };
                         if (this.form.is_raw) { payload.args = this.form.url; payload.url = ''; }
                         const r = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                        if (!r.ok) { const e = await r.json(); alert(e.error); return; }
-                        this.form.url = '';
+                        if (!r.ok) {
+                            const e = await r.json();
+                            this.showToast(e.error, 'error');
+                            return;
+                        }
+                        this.showToast(this.t('taskAdded'), 'success');
+                        // Intentionally keeping URL around for easier back-to-back downloads or accidental clicks
                     } finally { this.loading = false; }
                 },
 
@@ -570,7 +587,11 @@
                     try {
                         const r = await fetch('/api/formats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: this.form.url }) });
                         const d = await r.json();
-                        this.formatOutput = d.output || d.error || 'No output';
+                        if (!r.ok || d.error) {
+                            this.formatOutput = 'Error: ' + (d.error || 'Failed to list formats');
+                        } else {
+                            this.formatOutput = d.output || 'No output';
+                        }
                     } catch (e) { this.formatOutput = 'Error: ' + e.message; }
                 },
 
@@ -583,6 +604,17 @@
 
                 statusBadge(s) {
                     return { queued: 'badge-ghost', running: 'badge-primary animate-pulse', completed: 'badge-success', failed: 'badge-error', cancelled: 'badge-warning', paused: 'badge-info' }[s] || 'badge-ghost';
+                },
+
+                // Toast notification system
+                toasts: [],
+                toastId: 0,
+                showToast(msg, type = 'info') {
+                    const id = this.toastId++;
+                    this.toasts.push({ id, msg, type });
+                    setTimeout(() => {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 4000);
                 }
             };
         }
