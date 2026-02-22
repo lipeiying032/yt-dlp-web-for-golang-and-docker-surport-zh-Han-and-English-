@@ -43,6 +43,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
+          go mod tidy
           BINARY="yt-dlp-web-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}"
           go build -ldflags="-s -w" -trimpath -o "dist/${BINARY}" .
 
