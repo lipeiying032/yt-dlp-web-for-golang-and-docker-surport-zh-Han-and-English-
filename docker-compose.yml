@@ -1,0 +1,21 @@
+services:
+  yt-dlp-web:
+    build: .
+    container_name: yt-dlp-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MAX_CONCURRENT=2
+    volumes:
+      - ./downloads:/app/downloads
+      - ./config:/app/config
+      # Optional: mount browser cookies for --cookies-from-browser
+      # - ~/.config/google-chrome:/home/app/.config/google-chrome:ro
+
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
