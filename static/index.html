@@ -368,8 +368,6 @@
                                     <span x-show="task.status==='running'"
                                         class="text-xs text-base-content/60 font-mono"
                                         x-text="[task.speed, task.size, task.eta?('ETA '+task.eta):''].filter(Boolean).join(' · ')"></span>
-                                    <span x-show="task.error" class="text-xs text-error truncate max-w-[200px]"
-                                        x-text="task.error"></span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1 flex-shrink-0">
@@ -391,10 +389,16 @@
                         </div>
 
                         <!-- Progress bar -->
-                        <div x-show="task.percent > 0 || task.status==='running'" class="w-full">
+                        <div x-show="task.percent > 0 || task.status==='running'" class="w-full mt-2">
                             <progress class="progress progress-primary w-full h-1.5" :value="task.percent"
                                 max="100"></progress>
                             <div class="text-right text-[11px] font-mono text-primary" x-text="task.progress"></div>
+                        </div>
+
+                        <!-- Error Banner for mobile visibility -->
+                        <div x-show="task.error"
+                            class="bg-error/10 text-error rounded p-2 mt-2 text-xs break-words border border-error/20 font-medium">
+                            ⚠ <span x-text="task.error"></span>
                         </div>
 
                         <!-- Logs -->
@@ -533,16 +537,16 @@
                     this.ws.onmessage = (e) => {
                         const msg = JSON.parse(e.data);
                         if (msg.type === 'init') {
-                            this.tasks = (msg.tasks || []).map(t => ({ ...t, _showLog: false }));
+                            this.tasks = (msg.tasks || []).map(t => ({ ...t, _showLog: t.status === 'running' || t.status === 'failed' }));
                         } else if (msg.type === 'update') {
                             const t = msg.task;
                             const idx = this.tasks.findIndex(x => x.id === t.id);
                             if (idx >= 0) {
                                 const sl = this.tasks[idx]._showLog;
-                                this.tasks[idx] = { ...t, _showLog: sl };
+                                this.tasks.splice(idx, 1, { ...t, _showLog: sl });
                                 if (sl) this.$nextTick(() => { const el = document.getElementById('log-' + t.id); if (el) el.scrollTop = el.scrollHeight; });
                             } else {
-                                this.tasks.unshift({ ...t, _showLog: false });
+                                this.tasks.unshift({ ...t, _showLog: true }); // auto-expand logs for new tasks
                             }
                         }
                     };
