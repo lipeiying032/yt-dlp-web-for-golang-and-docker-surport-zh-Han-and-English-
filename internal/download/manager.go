@@ -387,7 +387,13 @@ func (m *Manager) failTask(t *Task, err error) {
 	t.mu.Lock()
 	t.Status = StatusFailed
 	t.Error = err.Error()
-	t.AddLog("ERROR: " + err.Error())
+
+	// Prevent deadlock! t.AddLog also tries to lock t.mu, so we interact with the slice directly.
+	t.Logs = append(t.Logs, "ERROR: "+err.Error())
+	if len(t.Logs) > 500 {
+		t.Logs = t.Logs[len(t.Logs)-500:]
+	}
+
 	t.UpdatedAt = time.Now()
 	t.mu.Unlock()
 	m.broadcast(t)
