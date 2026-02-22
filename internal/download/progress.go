@@ -35,6 +35,9 @@ var (
 
 	reAlreadyDl = regexp.MustCompile(
 		`\[download\]\s+(.+)\s+has already been downloaded`)
+
+	rePostProcess = regexp.MustCompile(
+		`\[(?:ExtractAudio|VideoConvertor)\]\s+Destination:\s+(.+)$`)
 )
 
 // ParseLine inspects a single line of yt-dlp output and updates the task.
@@ -89,6 +92,12 @@ func ParseLine(line string, t *Task) bool {
 		if t.Title == t.URL || t.Title == "" {
 			t.Title = cleanTitle(t.Filename)
 		}
+		return true
+	}
+
+	// Post-processing output (e.g., ExtractAudio, VideoConvertor)
+	if m := rePostProcess.FindStringSubmatch(line); m != nil {
+		t.Filename = strings.TrimSpace(m[1])
 		return true
 	}
 

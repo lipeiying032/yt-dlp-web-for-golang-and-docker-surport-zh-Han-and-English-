@@ -166,10 +166,15 @@ func (m *Manager) Retry(id string) error {
 	return nil
 }
 
-// Delete removes a task from the list. Cancels if running.
+// Delete removes a task from the list and its physical files. Cancels if running.
 func (m *Manager) Delete(id string) error {
 	_ = m.Cancel(id) // best-effort cancel
 	m.mu.Lock()
+	t, exists := m.tasks[id]
+	if !exists {
+		m.mu.Unlock()
+		return nil
+	}
 	delete(m.tasks, id)
 	newOrder := make([]string, 0, len(m.order))
 	for _, oid := range m.order {
@@ -179,6 +184,13 @@ func (m *Manager) Delete(id string) error {
 	}
 	m.order = newOrder
 	m.mu.Unlock()
+
+	// Best-effort physical file deletion
+	if t.Filename != "" {
+		_ = os.Remove(t.Filename)
+		_ = os.Remove(t.Filename + ".part")
+		_ = os.Remove(t.Filename + ".ytdl")
+	}
 	return nil
 }
 
@@ -186,9 +198,11 @@ func (m *Manager) Delete(id string) error {
 func (m *Manager) ClearCompleted() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	var toDelete []*Task
 	count := 0
 	for id, t := range m.tasks {
 		if t.Status == StatusCompleted || t.Status == StatusFailed || t.Status == StatusCancelled {
+			toDelete = append(toDelete, t)
 			delete(m.tasks, id)
 			count++
 		}
@@ -200,6 +214,17 @@ func (m *Manager) ClearCompleted() int {
 		}
 	}
 	m.order = newOrder
+	m.mu.Unlock()
+
+	// Best-effort physical file deletion for cleared tasks
+	for _, t := range toDelete {
+		if t.Filename != "" {
+			_ = os.Remove(t.Filename)
+			_ = os.Remove(t.Filename + ".part")
+			_ = os.Remove(t.Filename + ".ytdl")
+		}
+	}
+
 	return count
 }
 
