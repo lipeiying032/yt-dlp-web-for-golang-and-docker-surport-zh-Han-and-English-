@@ -17,27 +17,36 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        String nativeLibraryDir = getApplicationInfo().nativeLibraryDir;
-        final String executablePath = nativeLibraryDir + "/libytdlpweb.so";
-        
-        Log.i("YTDLP-WEB", "Starting binary at " + executablePath);
-        
-        // Ensure yt-dlp-web has executable permission
-        File binFile = new File(executablePath);
-        if (binFile.exists()) {
-            binFile.setExecutable(true, false);
-        } else {
-            Log.e("YTDLP-WEB", "Binary NOT FOUND at " + executablePath);
-        }
 
         new Thread(() -> {
             try {
-                ProcessBuilder pb = new ProcessBuilder(executablePath);
+                String abi = android.os.Build.SUPPORTED_ABIS[0];
+                String ytdlpAsset = "bin/yt-dlp_arm64-v8a";
+                String serverAsset = "bin/ytdlpweb_arm64-v8a";
+                
+                if (abi.contains("x86_64")) {
+                    ytdlpAsset = "bin/yt-dlp_x86_64";
+                    serverAsset = "bin/ytdlpweb_x86_64";
+                } else if (abi.contains("x86")) {
+                    ytdlpAsset = "bin/yt-dlp_x86";
+                    serverAsset = "bin/ytdlpweb_x86";
+                } else if (abi.contains("armeabi-v7a") || abi.contains("arm-v7a")) {
+                    ytdlpAsset = "bin/yt-dlp_armeabi-v7a";
+                    serverAsset = "bin/ytdlpweb_armeabi-v7a";
+                }
+
+                File serverFile = new File(getFilesDir(), "yt-dlp-web");
+                File ytDlpFile = new File(getFilesDir(), "yt-dlp");
+
+                extractAsset(serverAsset, serverFile);
+                extractAsset(ytdlpAsset, ytDlpFile);
+
+                ProcessBuilder pb = new ProcessBuilder(serverFile.getAbsolutePath());
                 pb.environment().put("PORT", "8080");
                 pb.environment().put("DOWNLOAD_DIR", getExternalFilesDir(null).getAbsolutePath() + "/downloads");
                 pb.environment().put("CONFIG_DIR", getFilesDir().getAbsolutePath() + "/config");
                 pb.environment().put("STATIC_DIR", ""); // Empty meaning use embed.FS
+                pb.environment().put("YTDLP_PATH", ytDlpFile.getAbsolutePath());
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
                 
@@ -80,5 +89,23 @@ public class MainActivity extends Activity {
             serverProcess.destroy();
         }
         super.onDestroy();
+    }
+
+    private void extractAsset(String assetName, File targetFile) {
+        if (targetFile.exists()) {
+            return; // Already extracted
+        }
+        try (java.io.InputStream is = getAssets().open(assetName);
+             java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = is.read(buffer)) != -1) {
+                fos.write(buffer, 0, read);
+            }
+            targetFile.setExecutable(true, false);
+            Log.i("YTDLP-WEB", "Extracted and chmod+x: " + targetFile.getAbsolutePath());
+        } catch (Exception e) {
+            Log.e("YTDLP-WEB", "Failed to extract " + assetName, e);
+        }
     }
 }
