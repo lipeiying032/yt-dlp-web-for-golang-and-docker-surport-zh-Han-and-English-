@@ -67,8 +67,47 @@ jobs:
           name: yt-dlp-web-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/yt-dlp-web-*.*
 
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build Go binaries as native libs
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p android/app/src/main/jniLibs/armeabi-v7a
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          mkdir -p android/app/src/main/jniLibs/x86
+          
+          # Build all 4 Android-compatible architectures
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/arm64-v8a/libytdlpweb.so .
+          GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/armeabi-v7a/libytdlpweb.so .
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/x86_64/libytdlpweb.so .
+          GOOS=linux GOARCH=386 go build -ldflags="-s -w" -trimpath -o android/app/src/main/jniLibs/x86/libytdlpweb.so .
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build APK
+        run: |
+          cd android
+          gradle assembleRelease --no-daemon
+          mv app/build/outputs/apk/release/app-release-unsigned.apk ../yt-dlp-web-android-universal.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yt-dlp-web-android-apk
+          path: yt-dlp-web-android-universal.apk
+
   release:
-    needs: build
+    needs: [build, build-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
