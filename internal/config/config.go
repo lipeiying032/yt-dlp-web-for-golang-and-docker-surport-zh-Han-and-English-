@@ -28,6 +28,7 @@ func Load() *Config {
 	}
 
 	// Try to find yt-dlp in the same directory as the executable, useful for portable zero-config setups
+	// Only do this if YTDLP_PATH wasn't explicitly overridden (meaning it's the exact string "yt-dlp" default)
 	if cfg.YtDlpPath == "yt-dlp" {
 		if exePath, err := os.Executable(); err == nil {
 			importPath := func(name string) string {

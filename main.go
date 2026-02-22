@@ -50,7 +50,15 @@ func main() {
 	cfg := config.Load()
 
 	// Sanity check for yt-dlp existence to prevent silent failing downloads
-	if _, err := exec.LookPath(cfg.YtDlpPath); err != nil {
+	checkYtDlp := func(path string) error {
+		if _, err := os.Stat(path); err == nil {
+			return nil // Exists as absolute or relative path
+		}
+		_, err := exec.LookPath(path)
+		return err // Fallback to system PATH check
+	}
+
+	if err := checkYtDlp(cfg.YtDlpPath); err != nil {
 		log.Printf("-----------------------------------------------------------------------------")
 		log.Printf("WARNING/FATAL: yt-dlp executable not found at '%s' or in system PATH!", cfg.YtDlpPath)
 		log.Printf("Please download yt-dlp and place it in the same directory as this web UI, or")
