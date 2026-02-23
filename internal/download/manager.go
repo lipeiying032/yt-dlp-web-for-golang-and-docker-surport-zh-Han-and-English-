@@ -374,6 +374,10 @@ func (m *Manager) execute(t *Task) {
 	args = append(args, t.URL)
 
 	// Check yt-dlp exists: stat first, then PATH lookup
+	if strings.HasPrefix(m.cfg.YtDlpPath, "NOT_FOUND|") {
+		m.failTask(t, fmt.Errorf("YT-DLP NOT FOUND!\n\n%s", m.cfg.YtDlpPath))
+		return
+	}
 	if _, err := os.Stat(m.cfg.YtDlpPath); os.IsNotExist(err) {
 		if _, lookErr := exec.LookPath(m.cfg.YtDlpPath); lookErr != nil {
 			m.failTask(t, fmt.Errorf("yt-dlp not found at %s or in PATH", m.cfg.YtDlpPath))

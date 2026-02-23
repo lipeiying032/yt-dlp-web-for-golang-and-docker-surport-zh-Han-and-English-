@@ -53,6 +53,10 @@ func main() {
 
 	// Sanity check for yt-dlp existence to prevent silent failing downloads
 	checkYtDlp := func(path string) error {
+		// If path is a diagnostic string, show it directly
+		if strings.HasPrefix(path, "NOT_FOUND|") {
+			return fmt.Errorf("YT-DLP NOT FOUND!\n\nDiagnostic info:\n%s", path)
+		}
 		if _, err := os.Stat(path); err == nil {
 			return nil // Exists as absolute or relative path
 		}
@@ -61,12 +65,11 @@ func main() {
 	}
 
 	if err := checkYtDlp(cfg.YtDlpPath); err != nil {
-		log.Printf("-----------------------------------------------------------------------------")
-		log.Printf("WARNING/FATAL: yt-dlp executable not found at '%s' or in system PATH!", cfg.YtDlpPath)
-		log.Printf("Please download yt-dlp and place it in the same directory as this web UI, or")
-		log.Printf("add yt-dlp to your system PATH. Downloads will fail until this is fixed.")
-		log.Printf("err: %v", err)
-		log.Printf("-----------------------------------------------------------------------------")
+		log.Printf("=============================================================================")
+		log.Printf("FATAL: %v", err)
+		log.Printf("=============================================================================")
+		// On Android, we want this error to be visible to the user
+		// The Go server will still start, but downloads will fail with clear error
 	}
 
 	hub := handler.NewHub()
