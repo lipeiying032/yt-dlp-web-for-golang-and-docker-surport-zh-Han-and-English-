@@ -30,34 +30,16 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
-                String abi = android.os.Build.SUPPORTED_ABIS[0];
-                String ytdlpAsset;
-                String serverAsset;
+                // Binaries are in nativeLibraryDir as .so files (has exec permission)
+                String nativeDir = getApplicationInfo().nativeLibraryDir;
+                File serverFile = new File(nativeDir, "libytdlpweb.so");
+                File ytDlpFile = new File(nativeDir, "libytdlp.so");
 
-                if (abi.contains("arm64") || abi.contains("aarch64")) {
-                    ytdlpAsset = "bin/yt-dlp_arm64-v8a";
-                    serverAsset = "bin/ytdlpweb_arm64-v8a";
-                } else if (abi.contains("x86_64")) {
-                    ytdlpAsset = "bin/yt-dlp_x86_64";
-                    serverAsset = "bin/ytdlpweb_x86_64";
-                } else if (abi.contains("x86")) {
-                    ytdlpAsset = "bin/yt-dlp_x86";
-                    serverAsset = "bin/ytdlpweb_x86";
-                } else if (abi.contains("armeabi-v7a") || abi.contains("arm-v7a")) {
-                    ytdlpAsset = "bin/yt-dlp_armeabi-v7a";
-                    serverAsset = "bin/ytdlpweb_armeabi-v7a";
-                } else {
-                    Log.e(TAG, "Unsupported ABI: " + abi);
-                    return;
-                }
-
-                File serverFile = new File(getFilesDir(), "yt-dlp-web");
-                File ytDlpFile = new File(getFilesDir(), "yt-dlp");
-
-                if (!extractAsset(serverAsset, serverFile) || !extractAsset(ytdlpAsset, ytDlpFile)) {
+                if (!serverFile.exists()) {
+                    String msg = "Server binary not found: " + serverFile.getAbsolutePath();
+                    Log.e(TAG, msg);
                     handler.post(() -> webView.loadData(
-                        "<h2>Failed to extract binaries for ABI: " + abi + "</h2>",
-                        "text/html", "utf-8"));
+                        "<h2>" + msg + "</h2>", "text/html", "utf-8"));
                     return;
                 }
 
@@ -67,17 +49,20 @@ public class MainActivity extends Activity {
                     : getFilesDir().getAbsolutePath() + "/downloads";
                 new File(downloadDir).mkdirs();
 
+                String configDir = getFilesDir().getAbsolutePath() + "/config";
+                new File(configDir).mkdirs();
+
                 ProcessBuilder pb = new ProcessBuilder(serverFile.getAbsolutePath());
                 pb.environment().put("PORT", "8080");
                 pb.environment().put("DOWNLOAD_DIR", downloadDir);
-                pb.environment().put("CONFIG_DIR", getFilesDir().getAbsolutePath() + "/config");
+                pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
                 pb.environment().put("YTDLP_PATH", ytDlpFile.getAbsolutePath());
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
                 serverProcess = pb.start();
-                Log.i(TAG, "Server started successfully!");
+                Log.i(TAG, "Server started: " + serverFile.getAbsolutePath());
 
                 java.io.InputStream is = serverProcess.getInputStream();
                 java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is));
@@ -167,25 +152,5 @@ public class MainActivity extends Activity {
             serverProcess.destroyForcibly();
         }
         super.onDestroy();
-    }
-
-    private boolean extractAsset(String assetName, File targetFile) {
-        if (targetFile.exists()) {
-            targetFile.delete();
-        }
-        try (java.io.InputStream is = getAssets().open(assetName);
-             java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = is.read(buffer)) != -1) {
-                fos.write(buffer, 0, read);
-            }
-            targetFile.setExecutable(true, false);
-            Log.i(TAG, "Extracted: " + targetFile.getAbsolutePath());
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to extract " + assetName, e);
-            return false;
-        }
     }
 }

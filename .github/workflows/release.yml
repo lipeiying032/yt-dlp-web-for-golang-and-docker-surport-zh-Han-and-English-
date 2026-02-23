@@ -123,8 +123,6 @@ jobs:
         run: |
           go mod tidy
           
-          mkdir -p android/app/src/main/assets/bin
-          
           # Map Go architectures to Android ABI names
           declare -A ARCH_MAP=(
             ["arm64"]="arm64-v8a"
@@ -142,19 +140,22 @@ jobs:
           
           for arch in "${!ARCH_MAP[@]}"; do
             abi="${ARCH_MAP[$arch]}"
+            JNILIBS="android/app/src/main/jniLibs/$abi"
+            mkdir -p "$JNILIBS"
             
-            # Special case for 32-bit ARM
+            # Build Go server as .so (Android extracts jniLibs to executable nativeLibraryDir)
             if [ "$arch" = "arm" ]; then
-              GOARCH=$arch GOARM=7 go build -ldflags="-s -w" -trimpath -o "android/app/src/main/assets/bin/ytdlpweb_$abi" .
+              GOARCH=$arch GOARM=7 go build -ldflags="-s -w" -trimpath -o "$JNILIBS/libytdlpweb.so" .
             else
-              GOARCH=$arch go build -ldflags="-s -w" -trimpath -o "android/app/src/main/assets/bin/ytdlpweb_$abi" .
+              GOARCH=$arch go build -ldflags="-s -w" -trimpath -o "$JNILIBS/libytdlpweb.so" .
             fi
-            echo "Built native lib for $abi"
+            echo "Built server for $abi"
             
-            # Download matched yt-dlp binary to assets (skip if unsupported like x86 32-bit)
+            # Download yt-dlp as .so too
             if [ -n "${YTDLP_URLS[$arch]}" ]; then
               echo "Downloading yt-dlp for $abi..."
-              wget -q "${YTDLP_URLS[$arch]}" -O "android/app/src/main/assets/bin/yt-dlp_$abi" || true
+              wget -q "${YTDLP_URLS[$arch]}" -O "$JNILIBS/libytdlp.so" || true
+              chmod +x "$JNILIBS/libytdlp.so"
             fi
           done
 

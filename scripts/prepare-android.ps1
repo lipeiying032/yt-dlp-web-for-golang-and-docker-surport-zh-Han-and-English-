@@ -4,11 +4,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$AssetsBin = Join-Path $PSScriptRoot "..\android\app\src\main\assets\bin"
-if (-not (Test-Path $AssetsBin)) {
-    New-Item -ItemType Directory -Path $AssetsBin -Force
-    Write-Host "Created directory: $AssetsBin"
-}
+$JniLibsBase = Join-Path $PSScriptRoot "..\android\app\src\main\jniLibs"
 
 $ABIs = @{
     "arm64-v8a" = "arm64"
@@ -27,7 +23,11 @@ Write-Host "Building Go server for Android ABIs..."
 
 foreach ($abi in $ABIs.Keys) {
     $goArch = $ABIs[$abi]
-    $outFile = Join-Path $AssetsBin "ytdlpweb_$abi"
+    $abiDir = Join-Path $JniLibsBase $abi
+    if (-not (Test-Path $abiDir)) {
+        New-Item -ItemType Directory -Path $abiDir -Force | Out-Null
+    }
+    $outFile = Join-Path $abiDir "libytdlpweb.so"
     
     Write-Host "Building for $abi ($goArch)..."
     
@@ -41,12 +41,10 @@ foreach ($abi in $ABIs.Keys) {
         Remove-Item Env:\GOARM -ErrorAction SilentlyContinue
     }
     
-    $projectRoot = Join-Path $PSScriptRoot ".."
     go build -ldflags="-s -w" -trimpath -o $outFile .
 
-    
     if ($YtDlpUrls.ContainsKey($abi)) {
-        $ytdlpFile = Join-Path $AssetsBin "yt-dlp_$abi"
+        $ytdlpFile = Join-Path $abiDir "libytdlp.so"
         if (-not (Test-Path $ytdlpFile)) {
             Write-Host "Downloading yt-dlp for $abi..."
             Invoke-WebRequest -Uri $YtDlpUrls[$abi] -OutFile $ytdlpFile
