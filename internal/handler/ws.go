@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"yt-dlp-web/internal/download"
 
@@ -44,10 +45,9 @@ func (h *Hub) Unregister(c *websocket.Conn) {
 }
 
 // BroadcastTask sends a task update to all connected clients.
-// Uses a full Mutex (not RLock) to safely handle client removal on error.
 func (h *Hub) BroadcastTask(t *download.Task) {
 	data, err := json.Marshal(map[string]interface{}{
-		"type":  "update",
+		"type": "update",
 		"task": t.Snapshot(),
 	})
 	if err != nil {
@@ -57,11 +57,16 @@ func (h *Hub) BroadcastTask(t *download.Task) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	var stale []*websocket.Conn
 	for c := range h.clients {
+		_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		if err := c.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Printf("[ws] write error, removing client: %v", err)
-			c.Close()
-			delete(h.clients, c)
+			stale = append(stale, c)
 		}
+	}
+	for _, c := range stale {
+		c.Close()
+		delete(h.clients, c)
 	}
 }

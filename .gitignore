@@ -11,6 +11,9 @@ yt-dlp-web
 /dist/
 
 # Go
+*.test
+coverage.out
+vendor/
 
 # IDE
 .idea/
@@ -26,3 +29,4 @@ desktop.ini
 
 # Docker
 .docker/
+.env

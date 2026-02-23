@@ -1,14 +1,16 @@
 APP     := yt-dlp-web
 DIST    := dist
 LDFLAGS := -s -w
-GOFLAGS := CGO_ENABLED=0
+GO_ENV  := CGO_ENABLED=0
 
 PLATFORMS := \
 	windows/amd64/.exe \
 	windows/386/.exe \
 	windows/arm64/.exe \
 	darwin/amd64/ \
-	darwin/arm64/ 	linux/amd64/ 	linux/arm64/
+	darwin/arm64/ \
+	linux/amd64/ \
+	linux/arm64/
 
 .PHONY: build clean release
 
@@ -26,6 +28,6 @@ release: clean
 		$(eval EXT := $(word 3,$(subst /, ,$(platform))))\
 		$(eval OUT := $(DIST)/$(APP)-$(GOOS)-$(GOARCH)$(EXT))\
 		echo "Building $(OUT)" && \
-		$(GOFLAGS) GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		$(GO_ENV) GOOS=$(GOOS) GOARCH=$(GOARCH) \
 			go build -ldflags="$(LDFLAGS)" -trimpath -o $(OUT) . && \
 	) echo "Done"

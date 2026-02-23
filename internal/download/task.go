@@ -2,12 +2,12 @@ package download
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"os/exec"
 	"sync"
 	"time"
-
-	"crypto/rand"
-	"encoding/hex"
 )
 
 // TaskStatus represents the lifecycle state of a download task.
@@ -28,8 +28,8 @@ type Task struct {
 	URL       string     `json:"url"`
 	Title     string     `json:"title"`
 	Status    TaskStatus `json:"status"`
-	Progress  string     `json:"progress"`   // e.g. "45.2%"
-	Percent   float64    `json:"percent"`     // 0–100 numeric for progress bar
+	Progress  string     `json:"progress"` // e.g. "45.2%"
+	Percent   float64    `json:"percent"`  // 0–100 numeric for progress bar
 	Size      string     `json:"size"`
 	Speed     string     `json:"speed"`
 	ETA       string     `json:"eta"`
@@ -48,7 +48,11 @@ type Task struct {
 
 func randomID() string {
 	b := make([]byte, 6)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp-based ID
+		b = []byte(fmt.Sprintf("%06x", time.Now().UnixNano()&0xFFFFFFFFFFFF))
+		return string(b)
+	}
 	return hex.EncodeToString(b)
 }
 
@@ -72,12 +76,17 @@ func NewTask(url string, args []string) *Task {
 func (t *Task) Snapshot() map[string]interface{} {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	// Copy slices to avoid data race with concurrent AddLog
+	logs := make([]string, len(t.Logs))
+	copy(logs, t.Logs)
+	args := make([]string, len(t.Args))
+	copy(args, t.Args)
 	return map[string]interface{}{
 		"id": t.ID, "url": t.URL, "title": t.Title,
 		"status": t.Status, "progress": t.Progress, "percent": t.Percent,
 		"size": t.Size, "speed": t.Speed, "eta": t.ETA,
-		"filename": t.Filename, "error": t.Error, "logs": t.Logs,
-		"args": t.Args, "created_at": t.CreatedAt, "updated_at": t.UpdatedAt,
+		"filename": t.Filename, "error": t.Error, "logs": logs,
+		"args": args, "created_at": t.CreatedAt, "updated_at": t.UpdatedAt,
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,12 +20,14 @@ type Broadcaster func(t *Task)
 
 // Manager owns the task map, worker pool, and yt-dlp execution.
 type Manager struct {
-	tasks map[string]*Task
-	order []string // insertion order for stable listing
-	mu    sync.RWMutex
-	queue chan string // task IDs
-	cfg   *config.Config
-	bc    Broadcaster
+	tasks    map[string]*Task
+	order    []string // insertion order for stable listing
+	mu       sync.RWMutex
+	queue    chan string // task IDs
+	cfg      *config.Config
+	bc       Broadcaster
+	done     chan struct{} // closed on Shutdown
+	shutdown sync.Once
 }
 
 // NewManager creates the manager and starts worker goroutines.
@@ -35,6 +38,7 @@ func NewManager(cfg *config.Config, bc Broadcaster) *Manager {
 		queue: make(chan string, 512),
 		cfg:   cfg,
 		bc:    bc,
+		done:  make(chan struct{}),
 	}
 	for i := 0; i < cfg.MaxConcurrent; i++ {
 		go m.worker()
@@ -49,10 +53,8 @@ func (m *Manager) Submit(t *Task) {
 	m.order = append(m.order, t.ID)
 	m.mu.Unlock()
 	m.broadcast(t)
-	select {
-	case m.queue <- t.ID:
-	default:
-		m.failTask(t, fmt.Errorf("queue full, try again later"))
+	if !m.sendQueue(t.ID) {
+		m.failTask(t, fmt.Errorf("queue full or shutting down, try again later"))
 	}
 }
 
@@ -142,10 +144,8 @@ func (m *Manager) Resume(id string) error {
 	t.UpdatedAt = time.Now()
 	t.mu.Unlock()
 	m.broadcast(t)
-	// non-blocking send
-	select {
-	case m.queue <- t.ID:
-	default:
+	if !m.sendQueue(t.ID) {
+		m.failTask(t, fmt.Errorf("queue full or shutting down, try again later"))
 	}
 	return nil
 }
@@ -157,6 +157,10 @@ func (m *Manager) Retry(id string) error {
 		return fmt.Errorf("not found")
 	}
 	t.mu.Lock()
+	if t.Status != StatusFailed && t.Status != StatusCompleted && t.Status != StatusCancelled {
+		t.mu.Unlock()
+		return fmt.Errorf("cannot retry task in state %s", t.Status)
+	}
 	t.Status = StatusQueued
 	t.Progress = "0%"
 	t.Percent = 0
@@ -167,9 +171,8 @@ func (m *Manager) Retry(id string) error {
 	t.UpdatedAt = time.Now()
 	t.mu.Unlock()
 	m.broadcast(t)
-	select {
-	case m.queue <- t.ID:
-	default:
+	if !m.sendQueue(t.ID) {
+		m.failTask(t, fmt.Errorf("queue full or shutting down, try again later"))
 	}
 	return nil
 }
@@ -193,23 +196,7 @@ func (m *Manager) Delete(id string) error {
 	m.order = newOrder
 	m.mu.Unlock()
 
-	// Best-effort physical file deletion
-	if t.Filename != "" {
-		_ = os.Remove(t.Filename)
-		_ = os.Remove(t.Filename + ".part")
-		_ = os.Remove(t.Filename + ".ytdl")
-
-		// Also wipe any sibling artifacts (like info.json, descriptions, thumbnails, subtitles)
-		base := t.Filename
-		if ext := filepath.Ext(base); ext != "" {
-			base = base[:len(base)-len(ext)]
-		}
-		if matches, _ := filepath.Glob(base + "*"); len(matches) > 0 {
-			for _, match := range matches {
-				_ = os.Remove(match)
-			}
-		}
-	}
+	m.removeTaskFiles(t.Filename)
 	return nil
 }
 
@@ -219,7 +206,10 @@ func (m *Manager) ClearCompleted() int {
 	var toDelete []*Task
 	count := 0
 	for id, t := range m.tasks {
-		if t.Status == StatusCompleted || t.Status == StatusFailed || t.Status == StatusCancelled {
+		t.mu.Lock()
+		done := t.Status == StatusCompleted || t.Status == StatusFailed || t.Status == StatusCancelled
+		t.mu.Unlock()
+		if done {
 			toDelete = append(toDelete, t)
 			delete(m.tasks, id)
 			count++
@@ -236,21 +226,7 @@ func (m *Manager) ClearCompleted() int {
 
 	// Best-effort physical file deletion for cleared tasks
 	for _, t := range toDelete {
-		if t.Filename != "" {
-			_ = os.Remove(t.Filename)
-			_ = os.Remove(t.Filename + ".part")
-			_ = os.Remove(t.Filename + ".ytdl")
-
-			base := t.Filename
-			if ext := filepath.Ext(base); ext != "" {
-				base = base[:len(base)-len(ext)]
-			}
-			if matches, _ := filepath.Glob(base + "*"); len(matches) > 0 {
-				for _, match := range matches {
-					_ = os.Remove(match)
-				}
-			}
-		}
+		m.removeTaskFiles(t.Filename)
 	}
 
 	return count
@@ -273,6 +249,76 @@ func (m *Manager) ListFormats(url string, extraArgs []string) (string, error) {
 		return string(out), err
 	}
 	return string(out), nil
+}
+
+// removeTaskFiles safely removes a task's files and related artifacts.
+// It validates that the file is within the download directory to prevent path traversal.
+func (m *Manager) removeTaskFiles(filename string) {
+	if filename == "" {
+		return
+	}
+	// Resolve to absolute and verify it's inside the download directory
+	absFile, err := filepath.Abs(filename)
+	if err != nil {
+		return
+	}
+	absDir, err := filepath.Abs(m.cfg.DownloadDir)
+	if err != nil {
+		return
+	}
+	if !strings.HasPrefix(absFile, absDir+string(filepath.Separator)) {
+		return
+	}
+
+	_ = os.Remove(filename)
+	_ = os.Remove(filename + ".part")
+	_ = os.Remove(filename + ".ytdl")
+
+	// Remove sibling artifacts using escaped glob pattern
+	base := filename
+	if ext := filepath.Ext(base); ext != "" {
+		base = base[:len(base)-len(ext)]
+	}
+	// Escape glob special chars in the base name
+	escaped := strings.NewReplacer("[", "\\[", "]", "\\]", "?", "\\?", "*", "\\*").Replace(base)
+	if matches, _ := filepath.Glob(escaped + "*"); len(matches) > 0 {
+		for _, match := range matches {
+			absMatch, e := filepath.Abs(match)
+			if e != nil || !strings.HasPrefix(absMatch, absDir+string(filepath.Separator)) {
+				continue
+			}
+			_ = os.Remove(match)
+		}
+	}
+}
+
+// sendQueue safely sends a task ID to the queue, returning false if shutdown.
+func (m *Manager) sendQueue(id string) bool {
+	select {
+	case <-m.done:
+		return false
+	case m.queue <- id:
+		return true
+	default:
+		return false
+	}
+}
+
+// Shutdown cancels all running tasks and closes the queue.
+func (m *Manager) Shutdown() {
+	m.shutdown.Do(func() {
+		close(m.done)
+		m.mu.RLock()
+		for _, t := range m.tasks {
+			t.mu.Lock()
+			if t.cancel != nil {
+				t.cancel()
+			}
+			t.mu.Unlock()
+		}
+		m.mu.RUnlock()
+		close(m.queue)
+	})
 }
 
 func (m *Manager) broadcast(t *Task) {

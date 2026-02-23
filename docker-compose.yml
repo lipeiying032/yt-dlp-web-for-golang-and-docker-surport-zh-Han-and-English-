@@ -8,14 +8,17 @@ services:
     environment:
       - PORT=8080
       - MAX_CONCURRENT=2
+      # - API_KEY=your-secret-key
     volumes:
       - ./downloads:/app/downloads
       - ./config:/app/config
-      # Optional: mount browser cookies for --cookies-from-browser
-      # - ~/.config/google-chrome:/home/app/.config/google-chrome:ro
-
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/health" ]
       interval: 30s
       timeout: 5s
+      start_period: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G

@@ -21,7 +21,6 @@ $YtDlpUrls = @{
     "arm64-v8a" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64"
     "armeabi-v7a" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_armv7l"
     "x86_64" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
-    "x86" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
 }
 
 Write-Host "Building Go server for Android ABIs..."
@@ -39,10 +38,12 @@ foreach ($abi in $ABIs.Keys) {
     if ($goArch -eq "arm") {
         $env:GOARM = "7"
     } else {
-        $env:GOARM = ""
+        Remove-Item Env:\GOARM -ErrorAction SilentlyContinue
     }
     
+    $projectRoot = Join-Path $PSScriptRoot ".."
     go build -ldflags="-s -w" -trimpath -o $outFile .
+
     
     if ($YtDlpUrls.ContainsKey($abi)) {
         $ytdlpFile = Join-Path $AssetsBin "yt-dlp_$abi"

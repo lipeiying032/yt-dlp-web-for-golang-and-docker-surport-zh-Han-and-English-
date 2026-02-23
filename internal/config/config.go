@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,8 +33,12 @@ func Load() *Config {
 		cfg.YtDlpPath = ResolveYtDlpPath(cfg.YtDlpPath)
 	}
 
-	_ = os.MkdirAll(cfg.DownloadDir, 0o755)
-	_ = os.MkdirAll(cfg.ConfigDir, 0o755)
+	if err := os.MkdirAll(cfg.DownloadDir, 0o755); err != nil {
+		log.Fatalf("failed to create download dir %s: %v", cfg.DownloadDir, err)
+	}
+	if err := os.MkdirAll(cfg.ConfigDir, 0o755); err != nil {
+		log.Fatalf("failed to create config dir %s: %v", cfg.ConfigDir, err)
+	}
 
 	// Default args applied to every download.
 	// --newline is critical for progress parsing.
@@ -47,8 +52,8 @@ func Load() *Config {
 		"--extractor-args", "youtube:player_client=android,web",
 		"--sleep-interval", "2",
 		"--max-sleep-interval", "6",
-		"--cache-dir", cfg.ConfigDir + "/cache",
-		"-o", cfg.DownloadDir + "/%(title)s [%(id)s].%(ext)s",
+		"--cache-dir", filepath.Join(cfg.ConfigDir, "cache"),
+		"-o", filepath.Join(cfg.DownloadDir, "%(title)s [%(id)s].%(ext)s"),
 	}
 
 	return cfg

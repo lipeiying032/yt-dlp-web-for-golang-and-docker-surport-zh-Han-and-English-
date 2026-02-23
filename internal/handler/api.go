@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"strings"
 
 	"yt-dlp-web/internal/download"
@@ -43,10 +44,13 @@ func (a *API) submitDownload(c *fiber.Ctx) error {
 
 	url, args := params.BuildArgs(&req)
 	if url == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "URL is required"})
+		return c.Status(400).JSON(fiber.Map{"error": "URL is required. For raw mode, include a URL in your command."})
 	}
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return c.Status(400).JSON(fiber.Map{"error": "URL must start with http:// or https://"})
+		if !req.IsRaw {
+			return c.Status(400).JSON(fiber.Map{"error": "URL must start with http:// or https://"})
+		}
+		return c.Status(400).JSON(fiber.Map{"error": "No valid URL found in raw command. Include an http(s) URL."})
 	}
 
 	task := download.NewTask(url, args)
@@ -106,9 +110,13 @@ func (a *API) listFormats(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "URL must start with http:// or https://"})
 	}
 	extra := params.SplitShell(body.Args)
+	extra, sanitizeErr := params.SanitizeArgs(extra)
+	if sanitizeErr != nil {
+		log.Printf("[api] listFormats: %v", sanitizeErr)
+	}
 	out, err := a.mgr.ListFormats(body.URL, extra)
 	if err != nil {
-		return c.JSON(fiber.Map{"ok": false, "output": out, "error": err.Error()})
+		return c.Status(500).JSON(fiber.Map{"ok": false, "output": out, "error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"ok": true, "output": out})
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"yt-dlp-web/internal/config"
@@ -86,7 +88,32 @@ func main() {
 		Format:     "${time} ${status} ${method} ${path} ${latency}\n",
 		TimeFormat: "15:04:05",
 	}))
-	app.Use(cors.New())
+	corsOrigins := os.Getenv("CORS_ORIGINS")
+	if corsOrigins == "" {
+		corsOrigins = fmt.Sprintf("http://localhost:%s, http://127.0.0.1:%s", cfg.Port, cfg.Port)
+	}
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     corsOrigins,
+		AllowMethods:     "GET,POST,DELETE",
+		AllowHeaders:     "Content-Type, X-API-Key",
+		AllowCredentials: false,
+	}))
+
+	// Optional API key authentication via API_KEY env var
+	apiKey := os.Getenv("API_KEY")
+	if apiKey != "" {
+		app.Use(func(c *fiber.Ctx) error {
+			// Skip auth for health check and static files
+			p := c.Path()
+			if p == "/health" || (!strings.HasPrefix(p, "/api/") && !strings.HasPrefix(p, "/ws")) {
+				return c.Next()
+			}
+			if subtle.ConstantTimeCompare([]byte(c.Get("X-API-Key")), []byte(apiKey)) == 1 {
+				return c.Next()
+			}
+			return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+		})
+	}
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -138,6 +165,7 @@ func main() {
 		signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 		<-quit
 		log.Println("Shutting down...")
+		mgr.Shutdown()
 		_ = app.Shutdown()
 	}()
 
