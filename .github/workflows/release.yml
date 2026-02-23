@@ -132,24 +132,13 @@ jobs:
           go build -ldflags="-s -w" -trimpath -o "$JNILIBS/libytdlpweb.so" .
           echo "Built server for arm64-v8a"
           
-          # Download Python 3.14 for Android (official embeddable)
+          # Prepare assets directory
           mkdir -p "android/app/src/main/assets"
-          wget -q "https://www.python.org/ftp/python/3.14.3/python-3.14.3-embed-aarch64.tar.xz" -O "/tmp/python-android.tar.xz" || \
-            wget -q "https://www.python.org/ftp/python/3.14.2/python-3.14.2-embed-aarch64.tar.xz" -O "/tmp/python-android.tar.xz"
-          if [ -f /tmp/python-android.tar.xz ]; then
-            tar -xf /tmp/python-android.tar.xz -C "android/app/src/main/assets/"
-            chmod +x "android/app/src/main/assets/"*/python3
-            echo "Python3 ready"
-            ls -la "android/app/src/main/assets/"
-          else
-            echo "Python download failed, will try yt-dlp.py only"
-          fi
           
-          # Download yt-dlp as Python script
+          # Download yt-dlp as Python script (always include)
+          echo "Downloading yt-dlp.py..."
           wget -q "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -O "android/app/src/main/assets/yt-dlp.py"
           chmod +x "android/app/src/main/assets/yt-dlp.py"
-          
-          echo "yt-dlp Python script ready"
           ls -la "android/app/src/main/assets/"
 
       - name: Setup Gradle
