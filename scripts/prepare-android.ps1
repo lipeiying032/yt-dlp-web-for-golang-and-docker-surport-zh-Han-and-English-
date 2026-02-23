@@ -5,10 +5,6 @@
 $ErrorActionPreference = "Stop"
 
 $JniLibsBase = Join-Path $PSScriptRoot "..\android\app\src\main\jniLibs"
-$AssetsBin = Join-Path $PSScriptRoot "..\android\app\src\main\assets\bin"
-if (-not (Test-Path $AssetsBin)) {
-    New-Item -ItemType Directory -Path $AssetsBin -Force | Out-Null
-}
 
 $ABIs = @{
     "arm64-v8a" = "arm64"
@@ -48,7 +44,7 @@ foreach ($abi in $ABIs.Keys) {
     go build -ldflags="-s -w" -trimpath -o $outFile .
 
     if ($YtDlpUrls.ContainsKey($abi)) {
-        $ytdlpFile = Join-Path $AssetsBin "yt-dlp_$abi"
+        $ytdlpFile = Join-Path $abiDir "libytdlp.so"
         if (-not (Test-Path $ytdlpFile)) {
             Write-Host "Downloading yt-dlp for $abi..."
             Invoke-WebRequest -Uri $YtDlpUrls[$abi] -OutFile $ytdlpFile

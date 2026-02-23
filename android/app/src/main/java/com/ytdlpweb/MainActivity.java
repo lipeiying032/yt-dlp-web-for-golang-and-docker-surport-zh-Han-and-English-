@@ -39,19 +39,9 @@ public class MainActivity extends Activity {
                     return;
                 }
 
-                // If yt-dlp not in nativeLibraryDir, extract from assets as fallback
                 if (!ytDlpFile.exists()) {
-                    String abi = android.os.Build.SUPPORTED_ABIS[0];
-                    String abiName;
-                    if (abi.contains("arm64") || abi.contains("aarch64")) abiName = "arm64-v8a";
-                    else if (abi.contains("x86_64")) abiName = "x86_64";
-                    else if (abi.contains("armeabi") || abi.contains("arm-v7")) abiName = "armeabi-v7a";
-                    else if (abi.contains("x86")) abiName = "x86";
-                    else { showError("Unsupported ABI: " + abi); return; }
-
-                    File fallback = new File(getFilesDir(), "yt-dlp");
-                    extractAsset("bin/yt-dlp_" + abiName, fallback);
-                    ytDlpFile = fallback;
+                    showError("yt-dlp binary not found: " + ytDlpFile.getAbsolutePath());
+                    return;
                 }
 
                 File externalDir = getExternalFilesDir(null);
@@ -171,16 +161,4 @@ public class MainActivity extends Activity {
             "<h2>" + msg + "</h2>", "text/html", "utf-8"));
     }
 
-    private void extractAsset(String assetName, File target) {
-        try (java.io.InputStream is = getAssets().open(assetName);
-             java.io.FileOutputStream fos = new java.io.FileOutputStream(target)) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) != -1) fos.write(buf, 0, n);
-            target.setExecutable(true, false);
-            Log.i(TAG, "Extracted: " + target.getAbsolutePath());
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to extract " + assetName + ": " + e.getMessage());
-        }
-    }
 }
