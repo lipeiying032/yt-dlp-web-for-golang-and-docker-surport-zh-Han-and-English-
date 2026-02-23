@@ -54,8 +54,12 @@ public class MainActivity extends Activity {
                 File serverFile = new File(getFilesDir(), "yt-dlp-web");
                 File ytDlpFile = new File(getFilesDir(), "yt-dlp");
 
-                extractAsset(serverAsset, serverFile);
-                extractAsset(ytdlpAsset, ytDlpFile);
+                if (!extractAsset(serverAsset, serverFile) || !extractAsset(ytdlpAsset, ytDlpFile)) {
+                    handler.post(() -> webView.loadData(
+                        "<h2>Failed to extract binaries for ABI: " + abi + "</h2>",
+                        "text/html", "utf-8"));
+                    return;
+                }
 
                 File externalDir = getExternalFilesDir(null);
                 String downloadDir = (externalDir != null)
@@ -83,6 +87,9 @@ public class MainActivity extends Activity {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start server", e);
+                handler.post(() -> webView.loadData(
+                    "<h2>Server failed to start</h2><p>" + e.getMessage() + "</p>",
+                    "text/html", "utf-8"));
             }
         }).start();
 
@@ -102,6 +109,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
+        webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         setContentView(webView);
 
         Runnable pollServer = new Runnable() {
@@ -109,6 +117,9 @@ public class MainActivity extends Activity {
             public void run() {
                 if (pollCount >= MAX_POLL_ATTEMPTS) {
                     Log.e(TAG, "Server failed to start after " + MAX_POLL_ATTEMPTS + " attempts");
+                    handler.post(() -> webView.loadData(
+                        "<h2>Server did not respond in time</h2><p>Check logcat for details.</p>",
+                        "text/html", "utf-8"));
                     return;
                 }
                 pollCount++;
@@ -158,7 +169,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    private void extractAsset(String assetName, File targetFile) {
+    private boolean extractAsset(String assetName, File targetFile) {
         if (targetFile.exists()) {
             targetFile.delete();
         }
@@ -171,8 +182,10 @@ public class MainActivity extends Activity {
             }
             targetFile.setExecutable(true, false);
             Log.i(TAG, "Extracted: " + targetFile.getAbsolutePath());
+            return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to extract " + assetName, e);
+            return false;
         }
     }
 }
