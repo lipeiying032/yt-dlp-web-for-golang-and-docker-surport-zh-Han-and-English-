@@ -136,6 +136,9 @@ jobs:
             ["amd64"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
           )
           
+          # Install patchelf to convert yt-dlp from ET_EXEC to ET_DYN
+          sudo apt-get update && sudo apt-get install -y patchelf
+          
           for arch in "${!ARCH_MAP[@]}"; do
             abi="${ARCH_MAP[$arch]}"
             
@@ -163,9 +166,14 @@ jobs:
                 mv "$YTDLP_TMP" "$JNILIBS/libytdlp.so"
               fi
               
+              # Convert from ET_EXEC to ET_DYN so Android extracts it as shared library
+              # patchelf --set-soname libytdlp.so makes it a proper shared library
+              patchelf --set-soname libytdlp.so "$JNILIBS/libytdlp.so" 2>/dev/null || echo "patchelf failed, file might already be DYN"
+              
               if [ -f "$JNILIBS/libytdlp.so" ]; then
                 echo "yt-dlp ready for $abi"
                 chmod +x "$JNILIBS/libytdlp.so"
+                file "$JNILIBS/libytdlp.so"
               else
                 echo "ERROR: yt-dlp not found for $abi"
                 exit 1
