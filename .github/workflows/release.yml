@@ -181,9 +181,16 @@ jobs:
 
       - name: Build APK
         run: |
+          echo "=== Checking jniLibs before Gradle build ==="
+          find android/app/src/main/jniLibs -type f -exec ls -la {} \;
+          
           cd android
           gradle assembleRelease --no-daemon
           APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
+          
+          echo "=== Checking APK contents ==="
+          unzip -l "$APK" | grep -E "\.so$" || echo "No .so files found in APK!"
+          
           mv "$APK" ../yt-dlp-web-android-universal.apk
 
       - name: Upload APK Artifact
