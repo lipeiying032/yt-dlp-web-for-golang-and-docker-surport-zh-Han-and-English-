@@ -14,6 +14,7 @@ yt-dlp-web
 *.test
 coverage.out
 vendor/
+!static/vendor/
 
 # IDE
 .idea/
