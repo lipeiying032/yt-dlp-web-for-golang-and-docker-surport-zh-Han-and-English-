@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.net.Uri;
+import android.os.Environment;
 import java.io.File;
 
 public class MainActivity extends Activity {
@@ -47,7 +48,7 @@ public class MainActivity extends Activity {
                 else if (abi.contains("x86")) abiName = "x86";
                 else { showError("Unsupported ABI: " + abi); return; }
 
-                File ytDlpFile = new File(getCacheDir(), "yt-dlp");
+                File ytDlpFile = new File(getFilesDir(), "yt-dlp");
                 extractAsset("bin/yt-dlp_" + abiName, ytDlpFile);
                 
                 if (!ytDlpFile.exists()) {
@@ -55,20 +56,24 @@ public class MainActivity extends Activity {
                     return;
                 }
                 
+                // Explicitly chmod +x via shell command
+                try {
+                    Runtime.getRuntime().exec(new String[]{"chmod", "755", ytDlpFile.getAbsolutePath()}).waitFor();
+                } catch (Exception ignored) {}
+                
                 Log.i(TAG, "yt-dlp extracted to: " + ytDlpFile.getAbsolutePath());
 
-                File externalDir = getExternalFilesDir(null);
-                String downloadDir = (externalDir != null)
-                    ? externalDir.getAbsolutePath() + "/downloads"
-                    : getFilesDir().getAbsolutePath() + "/downloads";
-                new File(downloadDir).mkdirs();
+                // Use system public Download directory
+                File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
+                if (!ytdlpDownloadDir.exists()) ytdlpDownloadDir.mkdirs();
 
                 String configDir = getFilesDir().getAbsolutePath() + "/config";
                 new File(configDir).mkdirs();
 
                 ProcessBuilder pb = new ProcessBuilder(serverFile.getAbsolutePath());
                 pb.environment().put("PORT", "8080");
-                pb.environment().put("DOWNLOAD_DIR", downloadDir);
+                pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
                 pb.environment().put("YTDLP_PATH", ytDlpFile.getAbsolutePath());
