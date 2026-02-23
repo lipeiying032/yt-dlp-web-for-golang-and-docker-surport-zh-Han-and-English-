@@ -405,7 +405,12 @@ func (m *Manager) execute(t *Task) {
 	}
 
 	if err := cmd.Start(); err != nil {
-		m.failTask(t, err)
+		// If YtDlpPath is a diagnostic string, show it instead of system error
+		if strings.HasPrefix(m.cfg.YtDlpPath, "NOT_FOUND|") {
+			m.failTask(t, fmt.Errorf("YT-DLP NOT FOUND!\n\nDiagnostic info:\n%s", m.cfg.YtDlpPath))
+		} else {
+			m.failTask(t, err)
+		}
 		return
 	}
 
