@@ -139,7 +139,7 @@ jobs:
           for arch in "${!ARCH_MAP[@]}"; do
             abi="${ARCH_MAP[$arch]}"
             
-            # Go server -> jniLibs (extracted to nativeLibraryDir with exec permission)
+            # Go server -> jniLibs
             JNILIBS="android/app/src/main/jniLibs/$abi"
             mkdir -p "$JNILIBS"
             if [ "$arch" = "arm" ]; then
@@ -149,11 +149,11 @@ jobs:
             fi
             echo "Built server for $abi"
             
-            # yt-dlp -> jniLibs (useLegacyPackaging extracts all .so files to nativeLibraryDir)
+            # yt-dlp -> jniLibs (nativeLibraryDir has exec permission)
             if [ -n "${YTDLP_URLS[$arch]}" ]; then
               echo "Downloading yt-dlp for $abi..."
-              wget "${YTDLP_URLS[$arch]}" -O "$JNILIBS/libytdlp.so"
-              ls -la "$JNILIBS/"
+              wget "${YTDLP_URLS[$arch]}" -O "$JNILIBS/libytdlp.so" || echo "Warning: yt-dlp download failed for $abi, app will use system yt-dlp if available"
+              ls -la "$JNILIBS/" || true
             fi
           done
 
