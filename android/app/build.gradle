@@ -9,9 +9,9 @@ android {
     defaultConfig {
         applicationId "com.ytdlpweb"
         minSdk 24
-        targetSdk 28
-        versionCode 1
-        versionName "1.0"
+        targetSdk 34
+        versionCode Integer.valueOf(project.findProperty('VERSION_CODE') ?: '1')
+        versionName project.findProperty('VERSION_NAME') ?: '1.0'
     }
 
     buildTypes {

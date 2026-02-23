@@ -10,7 +10,7 @@ COPY go.mod go.sum* ./
 RUN go mod download 2>/dev/null || true
 COPY . .
 RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    CGO_ENABLED=0 GOOS=linux \
     go build -ldflags="-s -w" -trimpath -o /app/yt-dlp-web .
 
 # =============================================================================
@@ -36,21 +36,20 @@ LABEL maintainer="yt-dlp-web" \
 RUN pip install --no-cache-dir -U yt-dlp && \
     addgroup -g 1000 app && \
     adduser -u 1000 -G app -h /home/app -s /bin/sh -D app && \
-    mkdir -p /app/downloads /app/config /app/static && \
+    mkdir -p /app/downloads /app/config && \
     chown -R app:app /app /home/app
 
 # Copy binaries
 COPY --from=builder /app/yt-dlp-web /app/yt-dlp-web
 COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg /usr/local/bin/ffprobe /usr/local/bin/ffprobe
-COPY --chown=app:app static/ /app/static/
+# static files are embedded in the Go binary via embed.FS
 
 WORKDIR /app
 
 ENV PORT=8080 \
     DOWNLOAD_DIR=/app/downloads \
     CONFIG_DIR=/app/config \
-    STATIC_DIR=/app/static \
     MAX_CONCURRENT=2 \
     YTDLP_PATH=yt-dlp \
     HOME=/home/app \

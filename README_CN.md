@@ -45,6 +45,17 @@ docker compose up -d
 3. 在浏览器中打开提示的 URL 并输入授权码
 4. 令牌会缓存在 `CONFIG_DIR` 中，后续使用无需再次授权
 
+## 📱 移动端 (Android)
+
+本项目包含一个简单的 Android 原生包装（WebView）。由于 local 编译时 bin 文件不会自动下载，构建 APK 前请先准备资源：
+
+1. 确保已安装 **Go** 且 `go` 在 PATH 中。
+2. 运行初始化脚本 (Windows):
+   ```powershell
+   .\scripts\prepare-android.ps1
+   ```
+3. 使用 **Android Studio** 打开 `android` 目录，编译并运行。
+
 ## 🏗️ 项目结构
 
 ```

@@ -29,6 +29,12 @@ jobs:
           - goos: darwin
             goarch: arm64
             ext: ''
+          - goos: linux
+            goarch: amd64
+            ext: ''
+          - goos: linux
+            goarch: arm64
+            ext: ''
 
     steps:
       - uses: actions/checkout@v4
@@ -45,11 +51,7 @@ jobs:
         run: |
           go mod tidy
           BINARY="yt-dlp-web-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}"
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            go build -trimpath -o "dist/${BINARY}" .
-          else
-            go build -ldflags="-s -w" -trimpath -o "dist/${BINARY}" .
-          fi
+          go build -ldflags="-s -w" -trimpath -o "dist/${BINARY}" .
 
       - name: Archive (Windows → zip)
         if: matrix.goos == 'windows'
@@ -62,14 +64,21 @@ jobs:
           wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -O yt-dlp.exe
           
           echo "Downloading FFmpeg..."
-          wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip -O ffmpeg.zip
-          unzip -q -j ffmpeg.zip "ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe" "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe"
+          if [ "${{ matrix.goarch }}" = "amd64" ]; then
+            FF_ARCH="win64"
+          elif [ "${{ matrix.goarch }}" = "arm64" ]; then
+            FF_ARCH="winarm64"
+          else
+            FF_ARCH="win32"
+          fi
+          wget -q "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${FF_ARCH}-gpl.zip" -O ffmpeg.zip
+          unzip -q -j ffmpeg.zip "*/bin/ffmpeg.exe" "*/bin/ffprobe.exe"
           rm ffmpeg.zip
           
           zip -9 "${ARCHIVE}" "${BINARY}" "yt-dlp.exe" "ffmpeg.exe" "ffprobe.exe"
 
-      - name: Archive (macOS → tar.gz)
-        if: matrix.goos == 'darwin'
+      - name: Archive (macOS/Linux → tar.gz)
+        if: matrix.goos == 'darwin' || matrix.goos == 'linux'
         run: |
           cd dist
           BINARY="yt-dlp-web-${{ matrix.goos }}-${{ matrix.goarch }}"
@@ -112,6 +121,7 @@ jobs:
             ["arm64"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64"
             ["arm"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_armv7l"
             ["amd64"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+            ["386"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
           )
           
           for arch in "${!ARCH_MAP[@]}"; do

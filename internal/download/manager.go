@@ -209,7 +209,6 @@ func (m *Manager) Delete(id string) error {
 // ClearCompleted removes all completed/failed/cancelled tasks.
 func (m *Manager) ClearCompleted() int {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	var toDelete []*Task
 	count := 0
 	for id, t := range m.tasks {
@@ -306,6 +305,14 @@ func (m *Manager) execute(t *Task) {
 	args = append(args, m.cfg.DefaultArgs...)
 	args = append(args, t.Args...)
 	args = append(args, t.URL)
+
+	// Check yt-dlp exists: stat first, then PATH lookup
+	if _, err := os.Stat(m.cfg.YtDlpPath); os.IsNotExist(err) {
+		if _, lookErr := exec.LookPath(m.cfg.YtDlpPath); lookErr != nil {
+			m.failTask(t, fmt.Errorf("yt-dlp not found at %s or in PATH", m.cfg.YtDlpPath))
+			return
+		}
+	}
 
 	cmd := exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
 	cmd.Env = append(os.Environ(),

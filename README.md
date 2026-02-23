@@ -78,6 +78,17 @@ go build -ldflags="-s -w" -trimpath -o yt-dlp-web .
 3. Open the URL in your browser and enter the code
 4. Token is cached in `CONFIG_DIR` for future use
 
+## 📱 Mobile App (Android)
+
+This project includes a simple Android native wrapper (WebView). Since binaries are not bundled in the repo for local builds, you must prepare them before building the APK:
+
+1. Ensure **Go** is installed and in your PATH.
+2. Run the preparation script (Windows):
+   ```powershell
+   .\scripts\prepare-android.ps1
+   ```
+3. Open the `android` directory in **Android Studio**, then build and run.
+
 ## 🏗️ Architecture
 
 ```

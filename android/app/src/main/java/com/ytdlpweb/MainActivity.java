@@ -78,9 +78,27 @@ public class MainActivity extends Activity {
         webView.getSettings().setDomStorageEnabled(true);
         setContentView(webView);
         
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            webView.loadUrl("http://127.0.0.1:8080");
-        }, 1500);
+        // Poll until server is ready instead of fixed delay
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable pollServer = new Runnable() {
+            @Override
+            public void run() {
+                new Thread(() -> {
+                    try {
+                        java.net.HttpURLConnection c = (java.net.HttpURLConnection)
+                            new java.net.URL("http://127.0.0.1:8080/health").openConnection();
+                        c.setConnectTimeout(500);
+                        c.setReadTimeout(500);
+                        if (c.getResponseCode() == 200) {
+                            handler.post(() -> webView.loadUrl("http://127.0.0.1:8080"));
+                            return;
+                        }
+                    } catch (Exception ignored) {}
+                    handler.postDelayed(this, 300);
+                }).start();
+            }
+        };
+        handler.postDelayed(pollServer, 500);
     }
     
     @Override
@@ -92,8 +110,9 @@ public class MainActivity extends Activity {
     }
 
     private void extractAsset(String assetName, File targetFile) {
+        // Always re-extract to pick up updates after APK upgrade
         if (targetFile.exists()) {
-            return; // Already extracted
+            targetFile.delete();
         }
         try (java.io.InputStream is = getAssets().open(assetName);
              java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {

@@ -11,7 +11,6 @@ yt-dlp-web
 /dist/
 
 # Go
-go.sum
 
 # IDE
 .idea/
