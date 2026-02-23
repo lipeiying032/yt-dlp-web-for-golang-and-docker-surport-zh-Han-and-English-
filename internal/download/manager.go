@@ -389,16 +389,23 @@ func (m *Manager) execute(t *Task) {
 	}
 
 	// Log yt-dlp path for debugging
-	log.Printf("[execute] YtDlpPath=%s", m.cfg.YtDlpPath)
+	log.Printf("[execute] YtDlpPath=%s, UsePython=%v, PythonPath=%s", m.cfg.YtDlpPath, m.cfg.UsePython, m.cfg.PythonPath)
 	log.Printf("[execute] args=%v", args)
 
 	// Ensure download & cache dirs exist before every execution.
-	// On Android the dirs may vanish after startup (storage cleanup, permission changes).
 	os.MkdirAll(m.cfg.DownloadDir, 0o755)
 	os.MkdirAll(filepath.Join(m.cfg.ConfigDir, "cache"), 0o755)
 
-	cmd := exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
-	cmd.Dir = m.cfg.DownloadDir // yt-dlp resolves relative -o paths from cwd
+	var cmd *exec.Cmd
+	if m.cfg.UsePython {
+		// Python mode: use python3 to run yt-dlp.py
+		pythonPath := m.cfg.PythonPath
+		log.Printf("[execute] Using Python: %s %s", pythonPath, m.cfg.YtDlpPath)
+		cmd = exec.CommandContext(ctx, pythonPath, append([]string{m.cfg.YtDlpPath}, args...)...)
+	} else {
+		cmd = exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
+	}
+	cmd.Dir = m.cfg.DownloadDir
 	cmd.Env = append(os.Environ(),
 		"XDG_CACHE_HOME="+m.cfg.ConfigDir+"/cache",
 		"XDG_CONFIG_HOME="+m.cfg.ConfigDir,
