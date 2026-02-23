@@ -31,19 +31,21 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
-                // Extract yt-dlp from assets to filesDir
-                String ytdlpPath = AssetExtractor.extract(MainActivity.this);
-
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
+                File ytdlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
-                    showError("Server binary not found: " + serverFile.getAbsolutePath());
+                    showError("Server not found: " + serverFile.getAbsolutePath());
                     return;
                 }
-                
+                if (!ytdlpFile.exists()) {
+                    showError("yt-dlp not found: " + ytdlpFile.getAbsolutePath());
+                    return;
+                }
+
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
-                Log.i(TAG, "yt-dlp: " + ytdlpPath);
+                Log.i(TAG, "yt-dlp: " + ytdlpFile.getAbsolutePath());
 
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
@@ -57,7 +59,7 @@ public class MainActivity extends Activity {
                 pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
-                pb.environment().put("YTDLP_PATH", ytdlpPath);
+                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 

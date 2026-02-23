@@ -1,12 +1,10 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 // Config holds all application configuration loaded from environment variables.
@@ -68,42 +66,20 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// ResolveYtDlpPath finds yt-dlp binary. On Android the Java layer sets YTDLP_PATH
-// after extracting from assets, so this is mainly a fallback for desktop/Docker.
+// ResolveYtDlpPath is a fallback for desktop/Docker. On Android, YTDLP_PATH is set by Java.
 func ResolveYtDlpPath(fallback string) string {
 	exePath, err := os.Executable()
 	if err != nil {
 		return fallback
 	}
 	baseDir := filepath.Dir(exePath)
-
-	// Check common locations near the executable
-	for _, name := range []string{"yt-dlp", "yt-dlp.exe", "libytdlp.so"} {
+	for _, name := range []string{"yt-dlp", "yt-dlp.exe"} {
 		p := filepath.Join(baseDir, name)
 		if _, err := os.Stat(p); err == nil {
-			log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
 			return p
 		}
 	}
-
-	// Not found — return diagnostic
-	var diag strings.Builder
-	diag.WriteString(fmt.Sprintf("NOT_FOUND|exe=%s|dir=%s,files=[", exePath, baseDir))
-	if entries, e := os.ReadDir(baseDir); e == nil {
-		for i, ent := range entries {
-			if i > 0 {
-				diag.WriteByte(',')
-			}
-			name := ent.Name()
-			if ent.IsDir() {
-				name += "/"
-			}
-			diag.WriteString(name)
-		}
-	}
-	diag.WriteByte(']')
-	log.Printf("[ResolveYtDlpPath] %s", diag.String())
-	return diag.String()
+	return fallback
 }
 
 func envOrInt(key string, fallback int) int {
