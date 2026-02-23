@@ -13,6 +13,7 @@
     <application
         android:allowBackup="false"
         android:requestLegacyExternalStorage="true"
+        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:label="yt-dlp-web"
         android:supportsRtl="true"

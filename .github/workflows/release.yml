@@ -123,6 +123,9 @@ jobs:
         run: |
           go mod tidy
           
+          # Install patchelf to add SONAME to yt-dlp (makes it extractable by Android)
+          sudo apt-get update && sudo apt-get install -y patchelf
+          
           declare -A ARCH_MAP=(
             ["arm64"]="arm64-v8a"
             ["arm"]="armeabi-v7a"
@@ -149,7 +152,7 @@ jobs:
             fi
             echo "Built server for $abi"
             
-            # yt-dlp -> jniLibs as libytdlp.so (Android extracts jniLibs to nativeLibraryDir)
+            # yt-dlp -> jniLibs as libytdlp.so
             if [ -n "${YTDLP_URLS[$arch]}" ]; then
               echo "Downloading yt-dlp for $abi..."
               YTDLP_TMP="/tmp/ytdlp_$abi"
@@ -161,8 +164,13 @@ jobs:
               else
                 mv "$YTDLP_TMP" "$JNILIBS/libytdlp.so"
               fi
+              
+              # Add SONAME to make it a proper shared library for Android extraction
+              patchelf --set-soname libytdlp.so "$JNILIBS/libytdlp.so" || echo "patchelf not needed for $abi"
+              
               chmod +x "$JNILIBS/libytdlp.so"
               echo "yt-dlp ready for $abi"
+              file "$JNILIBS/libytdlp.so"
               ls -la "$JNILIBS/"
             fi
           done
