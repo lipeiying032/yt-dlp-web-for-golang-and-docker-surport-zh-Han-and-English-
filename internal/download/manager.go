@@ -389,7 +389,7 @@ func (m *Manager) execute(t *Task) {
 	}
 
 	// Log yt-dlp path for debugging
-	log.Printf("[execute] YtDlpPath=%s", m.cfg.YtDlpPath)
+	log.Printf("[execute] YtDlpPath=%s, UsePython=%v", m.cfg.YtDlpPath, m.cfg.UsePython)
 	log.Printf("[execute] args=%v", args)
 
 	// Ensure download & cache dirs exist before every execution.
@@ -397,7 +397,20 @@ func (m *Manager) execute(t *Task) {
 	os.MkdirAll(m.cfg.DownloadDir, 0o755)
 	os.MkdirAll(filepath.Join(m.cfg.ConfigDir, "cache"), 0o755)
 
-	cmd := exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
+	var cmd *exec.Cmd
+	if m.cfg.UsePython {
+		// Python mode: find python3 in the same directory as the script
+		scriptDir := filepath.Dir(m.cfg.YtDlpPath)
+		pythonPath := filepath.Join(scriptDir, "python3")
+		if _, err := os.Stat(pythonPath); os.IsNotExist(err) {
+			// Try parent directories
+			pythonPath = filepath.Join(scriptDir, "..", "python3")
+		}
+		log.Printf("[execute] Using Python: %s %s", pythonPath, m.cfg.YtDlpPath)
+		cmd = exec.CommandContext(ctx, pythonPath, append([]string{m.cfg.YtDlpPath}, args...)...)
+	} else {
+		cmd = exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
+	}
 	cmd.Dir = m.cfg.DownloadDir // yt-dlp resolves relative -o paths from cwd
 	cmd.Env = append(os.Environ(),
 		"XDG_CACHE_HOME="+m.cfg.ConfigDir+"/cache",

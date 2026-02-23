@@ -15,6 +15,7 @@ type Config struct {
 	StaticDir     string
 	MaxConcurrent int
 	YtDlpPath     string
+	UsePython     bool
 	DefaultArgs   []string
 }
 
@@ -27,11 +28,14 @@ func Load() *Config {
 		StaticDir:     envOr("STATIC_DIR", "./static"),
 		MaxConcurrent: envOrInt("MAX_CONCURRENT", 2),
 		YtDlpPath:     envOr("YTDLP_PATH", "yt-dlp"),
+		UsePython:     envOr("YTDLP_USE_PYTHON", "false") == "true",
 	}
 
-	if cfg.YtDlpPath == "yt-dlp" {
+	if cfg.YtDlpPath == "yt-dlp" && !cfg.UsePython {
 		cfg.YtDlpPath = ResolveYtDlpPath(cfg.YtDlpPath)
 	}
+
+	log.Printf("[Config] YtDlpPath=%s, UsePython=%v", cfg.YtDlpPath, cfg.UsePython)
 
 	if err := os.MkdirAll(cfg.DownloadDir, 0o755); err != nil {
 		log.Fatalf("failed to create download dir %s: %v", cfg.DownloadDir, err)
