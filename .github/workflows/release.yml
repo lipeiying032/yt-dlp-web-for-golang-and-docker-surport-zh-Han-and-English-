@@ -116,15 +116,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build Go binaries as native libs
+      - name: Build Go server and download yt-dlp
         env:
           CGO_ENABLED: '0'
           GOOS: linux
         run: |
           go mod tidy
-          
-          # Install patchelf to add SONAME to yt-dlp (makes it extractable by Android)
-          sudo apt-get update && sudo apt-get install -y patchelf
           
           declare -A ARCH_MAP=(
             ["arm64"]="arm64-v8a"
@@ -142,7 +139,7 @@ jobs:
           for arch in "${!ARCH_MAP[@]}"; do
             abi="${ARCH_MAP[$arch]}"
             
-            # Go server -> jniLibs
+            # Go server -> jniLibs (still a native lib, loaded by Android)
             JNILIBS="android/app/src/main/jniLibs/$abi"
             mkdir -p "$JNILIBS"
             if [ "$arch" = "arm" ]; then
@@ -152,26 +149,24 @@ jobs:
             fi
             echo "Built server for $abi"
             
-            # yt-dlp -> jniLibs as libytdlp.so
+            # yt-dlp -> assets/bin/<abi>/yt-dlp (extracted at runtime by Java)
             if [ -n "${YTDLP_URLS[$arch]}" ]; then
+              ASSETS="android/app/src/main/assets/bin/$abi"
+              mkdir -p "$ASSETS"
               echo "Downloading yt-dlp for $abi..."
               YTDLP_TMP="/tmp/ytdlp_$abi"
               wget -q "${YTDLP_URLS[$arch]}" -O "$YTDLP_TMP"
               
               if [[ "${YTDLP_URLS[$arch]}" == *.zip ]]; then
                 unzip -o "$YTDLP_TMP" -d "/tmp/ytdlp_extract_$abi"
-                mv "/tmp/ytdlp_extract_$abi/yt-dlp_linux_armv7l" "$JNILIBS/libytdlp.so"
+                mv "/tmp/ytdlp_extract_$abi/yt-dlp_linux_armv7l" "$ASSETS/yt-dlp"
               else
-                mv "$YTDLP_TMP" "$JNILIBS/libytdlp.so"
+                mv "$YTDLP_TMP" "$ASSETS/yt-dlp"
               fi
               
-              # Add SONAME to make it a proper shared library for Android extraction
-              patchelf --set-soname libytdlp.so "$JNILIBS/libytdlp.so" || echo "patchelf not needed for $abi"
-              
-              chmod +x "$JNILIBS/libytdlp.so"
+              chmod +x "$ASSETS/yt-dlp"
               echo "yt-dlp ready for $abi"
-              file "$JNILIBS/libytdlp.so"
-              ls -la "$JNILIBS/"
+              ls -la "$ASSETS/"
             fi
           done
 
@@ -182,15 +177,17 @@ jobs:
 
       - name: Build APK
         run: |
-          echo "=== Checking jniLibs before Gradle build ==="
+          echo "=== Checking jniLibs ==="
           find android/app/src/main/jniLibs -type f -exec ls -la {} \;
+          echo "=== Checking assets/bin ==="
+          find android/app/src/main/assets -type f -exec ls -la {} \;
           
           cd android
           gradle assembleRelease --no-daemon
           APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
           
-          echo "=== Checking APK contents ==="
-          unzip -l "$APK" | grep -E "\.so$" || echo "No .so files found in APK!"
+          echo "=== APK contents ==="
+          unzip -l "$APK" | grep -E '\.(so|yt-dlp)' || true
           
           mv "$APK" ../yt-dlp-web-android-universal.apk
 

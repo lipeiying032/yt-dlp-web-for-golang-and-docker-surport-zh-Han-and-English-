@@ -68,74 +68,40 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// ResolveYtDlpPath brute-force searches for libytdlp.so / yt-dlp near the executable.
-// On Android, nativeLibraryDir varies wildly across vendors (arm64, arm64-v8a, etc.).
-// We search baseDir, parentDir, and up to 3 levels deep — no hardcoded ABI names.
+// ResolveYtDlpPath finds yt-dlp binary. On Android the Java layer sets YTDLP_PATH
+// after extracting from assets, so this is mainly a fallback for desktop/Docker.
 func ResolveYtDlpPath(fallback string) string {
 	exePath, err := os.Executable()
 	if err != nil {
 		return fallback
 	}
 	baseDir := filepath.Dir(exePath)
-	parentDir := filepath.Dir(baseDir)
-	names := []string{"libytdlp.so", "yt-dlp", "yt-dlp.exe"}
 
-	// Walk a directory up to maxDepth looking for target filenames.
-	search := func(root string, maxDepth int) string {
-		var found string
-		filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil || found != "" {
-				return filepath.SkipDir
-			}
-			// Enforce depth limit
-			rel, _ := filepath.Rel(root, path)
-			if strings.Count(rel, string(filepath.Separator)) >= maxDepth && d.IsDir() {
-				return filepath.SkipDir
-			}
-			if d.IsDir() {
-				return nil
-			}
-			for _, n := range names {
-				if d.Name() == n {
-					found = path
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		})
-		return found
-	}
-
-	// 1) baseDir (depth 0 — direct siblings of the executable)
-	if p := search(baseDir, 1); p != "" {
-		log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
-		return p
-	}
-	// 2) parentDir (depth up to 3 — covers lib/*/libytdlp.so and deeper)
-	if p := search(parentDir, 3); p != "" {
-		log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
-		return p
-	}
-
-	// Not found — build diagnostic with actual directory listings
-	var diag strings.Builder
-	diag.WriteString(fmt.Sprintf("NOT_FOUND|exe=%s", exePath))
-	for _, dir := range []string{baseDir, parentDir} {
-		diag.WriteString(fmt.Sprintf("|dir=%s,files=[", dir))
-		if entries, e := os.ReadDir(dir); e == nil {
-			for i, ent := range entries {
-				if i > 0 {
-					diag.WriteByte(',')
-				}
-				name := ent.Name()
-				if ent.IsDir() {
-					name += "/"
-				}
-				diag.WriteString(name)
-			}
+	// Check common locations near the executable
+	for _, name := range []string{"yt-dlp", "yt-dlp.exe", "libytdlp.so"} {
+		p := filepath.Join(baseDir, name)
+		if _, err := os.Stat(p); err == nil {
+			log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
+			return p
 		}
-		diag.WriteByte(']')
 	}
+
+	// Not found — return diagnostic
+	var diag strings.Builder
+	diag.WriteString(fmt.Sprintf("NOT_FOUND|exe=%s|dir=%s,files=[", exePath, baseDir))
+	if entries, e := os.ReadDir(baseDir); e == nil {
+		for i, ent := range entries {
+			if i > 0 {
+				diag.WriteByte(',')
+			}
+			name := ent.Name()
+			if ent.IsDir() {
+				name += "/"
+			}
+			diag.WriteString(name)
+		}
+	}
+	diag.WriteByte(']')
 	log.Printf("[ResolveYtDlpPath] %s", diag.String())
 	return diag.String()
 }

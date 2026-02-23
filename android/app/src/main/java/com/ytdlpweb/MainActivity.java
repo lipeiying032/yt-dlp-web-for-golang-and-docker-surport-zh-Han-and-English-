@@ -31,6 +31,9 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
+                // Extract yt-dlp from assets to filesDir
+                String ytdlpPath = AssetExtractor.extract(MainActivity.this);
+
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
 
@@ -40,8 +43,8 @@ public class MainActivity extends Activity {
                 }
                 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
+                Log.i(TAG, "yt-dlp: " + ytdlpPath);
 
-                // Use system public Download directory
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
                 if (!ytdlpDownloadDir.exists()) ytdlpDownloadDir.mkdirs();
@@ -54,7 +57,7 @@ public class MainActivity extends Activity {
                 pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
-                // YTDLP_PATH is resolved by Go code from nativeLibraryDir
+                pb.environment().put("YTDLP_PATH", ytdlpPath);
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
