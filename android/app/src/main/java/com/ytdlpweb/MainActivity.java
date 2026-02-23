@@ -33,35 +33,20 @@ public class MainActivity extends Activity {
             try {
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
+                File ytDlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
                     showError("Server binary not found: " + serverFile.getAbsolutePath());
                     return;
                 }
-
-                // Extract yt-dlp from assets to cacheDir and test execution
-                String abi = android.os.Build.SUPPORTED_ABIS[0];
-                String abiName;
-                if (abi.contains("arm64") || abi.contains("aarch64")) abiName = "arm64-v8a";
-                else if (abi.contains("x86_64")) abiName = "x86_64";
-                else if (abi.contains("armeabi") || abi.contains("arm-v7")) abiName = "armeabi-v7a";
-                else if (abi.contains("x86")) abiName = "x86";
-                else { showError("Unsupported ABI: " + abi); return; }
-
-                File ytDlpFile = new File(getFilesDir(), "yt-dlp");
-                extractAsset("bin/yt-dlp_" + abiName, ytDlpFile);
                 
                 if (!ytDlpFile.exists()) {
-                    showError("Failed to extract yt-dlp for " + abiName);
+                    showError("yt-dlp binary not found: " + ytDlpFile.getAbsolutePath());
                     return;
                 }
                 
-                // Explicitly chmod +x via shell command
-                try {
-                    Runtime.getRuntime().exec(new String[]{"chmod", "755", ytDlpFile.getAbsolutePath()}).waitFor();
-                } catch (Exception ignored) {}
-                
-                Log.i(TAG, "yt-dlp extracted to: " + ytDlpFile.getAbsolutePath());
+                Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
+                Log.i(TAG, "yt-dlp: " + ytDlpFile.getAbsolutePath());
 
                 // Use system public Download directory
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -177,20 +162,5 @@ public class MainActivity extends Activity {
         Log.e(TAG, msg);
         handler.post(() -> webView.loadData(
             "<h2>" + msg + "</h2>", "text/html", "utf-8"));
-    }
-
-    private void extractAsset(String assetName, File target) {
-        if (target.exists()) target.delete();
-        try (java.io.InputStream is = getAssets().open(assetName);
-             java.io.FileOutputStream fos = new java.io.FileOutputStream(target)) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) != -1) fos.write(buf, 0, n);
-            target.setExecutable(true, false);
-            target.setReadable(true, false);
-            Log.i(TAG, "Extracted: " + target.getAbsolutePath());
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to extract " + assetName + ": " + e.getMessage());
-        }
     }
 }

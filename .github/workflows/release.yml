@@ -136,8 +136,6 @@ jobs:
             ["amd64"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
           )
           
-          mkdir -p android/app/src/main/assets/bin
-          
           for arch in "${!ARCH_MAP[@]}"; do
             abi="${ARCH_MAP[$arch]}"
             
@@ -151,10 +149,11 @@ jobs:
             fi
             echo "Built server for $abi"
             
-            # yt-dlp -> assets (extracted at runtime to cacheDir)
+            # yt-dlp -> jniLibs (useLegacyPackaging extracts all .so files to nativeLibraryDir)
             if [ -n "${YTDLP_URLS[$arch]}" ]; then
               echo "Downloading yt-dlp for $abi..."
-              wget -q "${YTDLP_URLS[$arch]}" -O "android/app/src/main/assets/bin/yt-dlp_$abi" || true
+              wget "${YTDLP_URLS[$arch]}" -O "$JNILIBS/libytdlp.so"
+              ls -la "$JNILIBS/"
             fi
           done
 
