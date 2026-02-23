@@ -68,19 +68,50 @@ func envOr(key, fallback string) string {
 
 // ResolveYtDlpPath tries to find yt-dlp in the same directory as the executable.
 // On Android, the executable is in nativeLibraryDir, where jniLibs are extracted.
+// This function handles multiple possible extraction paths for different Android ROMs.
 func ResolveYtDlpPath(fallback string) string {
+	// 1. Get current executable path (usually .../lib/arm64-v8a/ or .../lib/arm64/)
 	exePath, err := os.Executable()
 	if err != nil {
 		return fallback
 	}
-	dir := filepath.Dir(exePath)
-	// Priority: libytdlp.so (Android jniLibs), then standard names
-	for _, name := range []string{"libytdlp.so", "yt-dlp.exe", "yt-dlp"} {
-		p := filepath.Join(dir, name)
+	baseDir := filepath.Dir(exePath)
+
+	// 2. Construct search priority list
+	// Priority: same directory, then parent lib directory with architecture folders
+	searchPaths := []string{
+		filepath.Join(baseDir, "libytdlp.so"),                           // Same directory
+		filepath.Join(baseDir, "..", "lib", "arm64-v8a", "libytdlp.so"), // Cross-directory fallback
+		filepath.Join(baseDir, "..", "lib", "arm64", "libytdlp.so"),     // Compatible shorthand directory
+	}
+
+	for _, p := range searchPaths {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
 	}
+
+	// 3. Ultimate fuzzy matching: recursively find libytdlp.so in baseDir and parent directories
+	// Solves some modified ROM extraction paths
+	matches, _ := filepath.Glob(filepath.Join(baseDir, "*", "libytdlp.so"))
+	if len(matches) > 0 {
+		return matches[0]
+	}
+
+	// Also try parent lib directories
+	matches, _ = filepath.Glob(filepath.Join(baseDir, "..", "lib", "*", "libytdlp.so"))
+	if len(matches) > 0 {
+		return matches[0]
+	}
+
+	// 4. Cross-platform compatibility
+	for _, name := range []string{"yt-dlp.exe", "yt-dlp"} {
+		p := filepath.Join(baseDir, name)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+
 	return fallback
 }
 
