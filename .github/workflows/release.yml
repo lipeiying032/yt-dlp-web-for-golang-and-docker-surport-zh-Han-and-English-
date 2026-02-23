@@ -132,30 +132,13 @@ jobs:
           go build -ldflags="-s -w" -trimpath -o "$JNILIBS/libytdlpweb.so" .
           echo "Built server for arm64-v8a"
           
-          # Prepare assets directory
+          # Put yt-dlp.py in assets (for Termux fallback)
           mkdir -p "android/app/src/main/assets/bin"
-          
-          # Download yt-dlp Python script
           wget -q "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -O "android/app/src/main/assets/bin/yt-dlp"
           chmod +x "android/app/src/main/assets/bin/yt-dlp"
           
-          # Download Python 3.11 for Android (from python-build-standalone)
-          # This is a standalone Python that works on Android
-          echo "Downloading Python3 for Android..."
-          wget -q "https://github.com/indygreg/python-build-standalone/releases/download/20240107/cpython-3.11.7+20240107-aarch64-unknown-linux-gnu-full.tar.zst" -O "/tmp/python.tar.zst" || \
-          wget -q "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-unknown-linux-gnu-full.tar.zst" -O "/tmp/python.tar.zst" || true
-          
-          if [ -f /tmp/python.tar.zst ]; then
-            tar -xf /tmp/python.tar.zst -C /tmp/
-            PYTHON_DIR=$(ls -d /tmp/python-*)
-            cp -r "$PYTHON_DIR"/* "android/app/src/main/assets/bin/"
-            chmod +x "android/app/src/main/assets/bin/"*/python3
-            echo "Python3 ready"
-          else
-            echo "Python download failed"
-          fi
-          
-          ls -laR "android/app/src/main/assets/"
+          ls -la "$JNILIBS/"
+          ls -la "android/app/src/main/assets/bin/"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
