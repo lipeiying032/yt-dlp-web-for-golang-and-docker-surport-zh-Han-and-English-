@@ -18,6 +18,7 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true
+            extractNativeLibs = true
         }
     }
 

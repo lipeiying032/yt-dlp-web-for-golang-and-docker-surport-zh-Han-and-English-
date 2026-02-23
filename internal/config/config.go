@@ -67,13 +67,15 @@ func envOr(key, fallback string) string {
 }
 
 // ResolveYtDlpPath tries to find yt-dlp in the same directory as the executable.
+// On Android, the executable is in nativeLibraryDir, where jniLibs are extracted.
 func ResolveYtDlpPath(fallback string) string {
 	exePath, err := os.Executable()
 	if err != nil {
 		return fallback
 	}
 	dir := filepath.Dir(exePath)
-	for _, name := range []string{"yt-dlp.exe", "yt-dlp", "libytdlp.so"} {
+	// Priority: libytdlp.so (Android jniLibs), then standard names
+	for _, name := range []string{"libytdlp.so", "yt-dlp.exe", "yt-dlp"} {
 		p := filepath.Join(dir, name)
 		if _, err := os.Stat(p); err == nil {
 			return p

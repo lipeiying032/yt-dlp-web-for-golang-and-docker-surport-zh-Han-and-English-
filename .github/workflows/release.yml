@@ -136,8 +136,6 @@ jobs:
             ["amd64"]="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
           )
           
-          mkdir -p android/app/src/main/assets/bin
-          
           for arch in "${!ARCH_MAP[@]}"; do
             abi="${ARCH_MAP[$arch]}"
             
@@ -151,7 +149,7 @@ jobs:
             fi
             echo "Built server for $abi"
             
-            # yt-dlp -> assets (extracted at runtime by MainActivity)
+            # yt-dlp -> jniLibs as libytdlp.so (Android extracts jniLibs to nativeLibraryDir)
             if [ -n "${YTDLP_URLS[$arch]}" ]; then
               echo "Downloading yt-dlp for $abi..."
               YTDLP_TMP="/tmp/ytdlp_$abi"
@@ -159,13 +157,13 @@ jobs:
               
               if [[ "${YTDLP_URLS[$arch]}" == *.zip ]]; then
                 unzip -o "$YTDLP_TMP" -d "/tmp/ytdlp_extract_$abi"
-                mv "/tmp/ytdlp_extract_$abi/yt-dlp_linux_armv7l" "android/app/src/main/assets/bin/yt-dlp_$abi"
+                mv "/tmp/ytdlp_extract_$abi/yt-dlp_linux_armv7l" "$JNILIBS/libytdlp.so"
               else
-                mv "$YTDLP_TMP" "android/app/src/main/assets/bin/yt-dlp_$abi"
+                mv "$YTDLP_TMP" "$JNILIBS/libytdlp.so"
               fi
-              chmod +x "android/app/src/main/assets/bin/yt-dlp_$abi"
+              chmod +x "$JNILIBS/libytdlp.so"
               echo "yt-dlp ready for $abi"
-              ls -la "android/app/src/main/assets/bin/"
+              ls -la "$JNILIBS/"
             fi
           done
 
