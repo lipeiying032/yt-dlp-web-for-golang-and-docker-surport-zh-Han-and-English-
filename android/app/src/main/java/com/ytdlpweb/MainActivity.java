@@ -33,50 +33,34 @@ public class MainActivity extends Activity {
             try {
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
+                File ytdlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
                     showError("Server not found: " + serverFile.getAbsolutePath());
                     return;
                 }
+                if (!ytdlpFile.exists()) {
+                    showError("yt-dlp not found: " + ytdlpFile.getAbsolutePath());
+                    return;
+                }
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
+                Log.i(TAG, "yt-dlp: " + ytdlpFile.getAbsolutePath());
 
-                // Check for Python in assets
-                String assetsPy3 = getFilesDir().getAbsolutePath() + "/assets/python3";
-                String assetsYtDlp = getFilesDir().getAbsolutePath() + "/assets/yt-dlp.py";
-                String ytdlpPath = null;
-                String ytdlpUsePython = "false";
+                File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
+                if (!ytdlpDownloadDir.exists()) ytdlpDownloadDir.mkdirs();
 
-                // Try to extract Python from assets if not already done
-                File py3File = new File(assetsPy3);
-                if (!py3File.exists()) {
-                    // Extract Python from APK assets
-                    String[] assets = getAssets().list("");
-                    for (String a : assets) {
-                        if (a.equals("python3") || a.startsWith("python3.")) {
-                            File outPy = new File(getFilesDir(), "assets");
-                            outPy.mkdirs();
-                            copyAsset(a, new File(outPy, "python3"));
-                            new File(outPy, "python3").setExecutable(true, false);
-                            Log.i(TAG, "Extracted Python3 to " + outPy.getAbsolutePath());
-                            break;
-                        }
-                    }
-                }
+                String configDir = getFilesDir().getAbsolutePath() + "/config";
+                new File(configDir).mkdirs();
 
-                // Extract yt-dlp.py
-                File ytdlpScript = new File(assetsYtDlp);
-                if (!ytdlpScript.exists()) {
-                    copyAsset("yt-dlp.py", ytdlpScript);
-                    ytdlpScript.setExecutable(true, false);
-                }
-
-                if (py3File.exists() && ytdlpScript.exists()) {
-                    ytdlpPath = assetsYtDlp;
-                    ytdlpUsePython = "true";
-                    Log.i(TAG, "Using Python: " + assetsPy3 + " with yt-dlp: " + assetsYtDlp);
-                } else {
-                    // Fallback to libytdlp.so
+                ProcessBuilder pb = new ProcessBuilder(serverFile.getAbsolutePath());
+                pb.environment().put("PORT", "8080");
+                pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
+                pb.environment().put("CONFIG_DIR", configDir);
+                pb.environment().put("STATIC_DIR", "");
+                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
+                pb.directory(getFilesDir());
                     File ytdlpFile = new File(nativeDir, "libytdlp.so");
                     if (!ytdlpFile.exists()) {
                         showError("yt-dlp not found: " + ytdlpFile.getAbsolutePath());
@@ -98,8 +82,7 @@ public class MainActivity extends Activity {
                 pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
-                pb.environment().put("YTDLP_PATH", ytdlpPath);
-                pb.environment().put("YTDLP_USE_PYTHON", ytdlpUsePython);
+                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
@@ -200,15 +183,7 @@ public class MainActivity extends Activity {
         handler.post(() -> webView.loadData(
             "<h2>" + msg + "</h2>", "text/html", "utf-8"));
     }
-
-    private void copyAsset(String assetName, File outFile) throws IOException {
-        java.io.InputStream in = getAssets().open(assetName);
-        try (java.io.OutputStream os = new java.io.FileOutputStream(outFile)) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) != -1) {
-                os.write(buf, 0, n);
-            }
+}
         } finally {
             in.close();
         }
