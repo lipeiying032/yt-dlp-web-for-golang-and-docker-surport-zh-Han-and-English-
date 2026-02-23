@@ -239,7 +239,9 @@ func (m *Manager) ListFormats(url string, extraArgs []string) (string, error) {
 	args = append(args, url)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	os.MkdirAll(filepath.Join(m.cfg.ConfigDir, "cache"), 0o755)
 	cmd := exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
+	cmd.Dir = m.cfg.DownloadDir
 	cmd.Env = append(os.Environ(),
 		"XDG_CACHE_HOME="+m.cfg.ConfigDir+"/cache",
 		"XDG_CONFIG_HOME="+m.cfg.ConfigDir,
@@ -385,7 +387,13 @@ func (m *Manager) execute(t *Task) {
 		}
 	}
 
+	// Ensure download & cache dirs exist before every execution.
+	// On Android the dirs may vanish after startup (storage cleanup, permission changes).
+	os.MkdirAll(m.cfg.DownloadDir, 0o755)
+	os.MkdirAll(filepath.Join(m.cfg.ConfigDir, "cache"), 0o755)
+
 	cmd := exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
+	cmd.Dir = m.cfg.DownloadDir // yt-dlp resolves relative -o paths from cwd
 	cmd.Env = append(os.Environ(),
 		"XDG_CACHE_HOME="+m.cfg.ConfigDir+"/cache",
 		"XDG_CONFIG_HOME="+m.cfg.ConfigDir,

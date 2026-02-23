@@ -68,9 +68,9 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// ResolveYtDlpPath tries to find yt-dlp in the same directory as the executable.
-// On Android, the executable is in nativeLibraryDir (e.g., lib/arm64-v8a/ or lib/arm64/).
-// If not found, returns a diagnostic path containing the actual directory structure.
+// ResolveYtDlpPath brute-force searches for libytdlp.so / yt-dlp near the executable.
+// On Android, nativeLibraryDir varies wildly across vendors (arm64, arm64-v8a, etc.).
+// We search baseDir, parentDir, and up to 3 levels deep — no hardcoded ABI names.
 func ResolveYtDlpPath(fallback string) string {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -78,73 +78,66 @@ func ResolveYtDlpPath(fallback string) string {
 	}
 	baseDir := filepath.Dir(exePath)
 	parentDir := filepath.Dir(baseDir)
+	names := []string{"libytdlp.so", "yt-dlp", "yt-dlp.exe"}
 
-	// Scan current directory
-	var baseFiles []string
-	if entries, err := os.ReadDir(baseDir); err == nil {
-		for _, e := range entries {
-			baseFiles = append(baseFiles, e.Name())
+	// Walk a directory up to maxDepth looking for target filenames.
+	search := func(root string, maxDepth int) string {
+		var found string
+		filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || found != "" {
+				return filepath.SkipDir
+			}
+			// Enforce depth limit
+			rel, _ := filepath.Rel(root, path)
+			if strings.Count(rel, string(filepath.Separator)) >= maxDepth && d.IsDir() {
+				return filepath.SkipDir
+			}
+			if d.IsDir() {
+				return nil
+			}
+			for _, n := range names {
+				if d.Name() == n {
+					found = path
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		})
+		return found
+	}
+
+	// 1) baseDir (depth 0 — direct siblings of the executable)
+	if p := search(baseDir, 1); p != "" {
+		log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
+		return p
+	}
+	// 2) parentDir (depth up to 3 — covers lib/*/libytdlp.so and deeper)
+	if p := search(parentDir, 3); p != "" {
+		log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
+		return p
+	}
+
+	// Not found — build diagnostic with actual directory listings
+	var diag strings.Builder
+	diag.WriteString(fmt.Sprintf("NOT_FOUND|exe=%s", exePath))
+	for _, dir := range []string{baseDir, parentDir} {
+		diag.WriteString(fmt.Sprintf("|dir=%s,files=[", dir))
+		if entries, e := os.ReadDir(dir); e == nil {
+			for i, ent := range entries {
+				if i > 0 {
+					diag.WriteByte(',')
+				}
+				name := ent.Name()
+				if ent.IsDir() {
+					name += "/"
+				}
+				diag.WriteString(name)
+			}
 		}
+		diag.WriteByte(']')
 	}
-
-	// Scan parent directory
-	var parentFiles []string
-	if entries, err := os.ReadDir(parentDir); err == nil {
-		for _, e := range entries {
-			parentFiles = append(parentFiles, e.Name())
-		}
-	}
-
-	// Scan grandparent directory
-	grandParentDir := filepath.Dir(parentDir)
-	var grandParentFiles []string
-	if entries, err := os.ReadDir(grandParentDir); err == nil {
-		for _, e := range entries {
-			grandParentFiles = append(grandParentFiles, e.Name())
-		}
-	}
-
-	log.Printf("[ResolveYtDlpPath] exePath=%s", exePath)
-	log.Printf("[ResolveYtDlpPath] baseDir=%s, files=%v", baseDir, baseFiles)
-	log.Printf("[ResolveYtDlpPath] parentDir=%s, files=%v", parentDir, parentFiles)
-	log.Printf("[ResolveYtDlpPath] grandParentDir=%s, files=%v", grandParentDir, grandParentFiles)
-
-	// Try direct match in baseDir
-	for _, name := range []string{"libytdlp.so", "yt-dlp", "yt-dlp.exe"} {
-		p := filepath.Join(baseDir, name)
-		if _, err := os.Stat(p); err == nil {
-			log.Printf("[ResolveYtDlpPath] FOUND in baseDir: %s", p)
-			return p
-		}
-	}
-
-	// Fuzzy search in parent directories
-	matches, _ := filepath.Glob(filepath.Join(parentDir, "*", "libytdlp.so"))
-	if len(matches) > 0 {
-		log.Printf("[ResolveYtDlpPath] FOUND by Glob: %s", matches[0])
-		return matches[0]
-	}
-
-	matches, _ = filepath.Glob(filepath.Join(parentDir, "*", "*", "libytdlp.so"))
-	if len(matches) > 0 {
-		log.Printf("[ResolveYtDlpPath] FOUND by deep Glob: %s", matches[0])
-		return matches[0]
-	}
-
-	// Not found - return diagnostic info as a special path
-	// This will cause an error when trying to execute, but the error message will show the directory structure
-	diag := fmt.Sprintf("NOT_FOUND|exe=%s|base=%s|baseFiles=[%s]|parent=%s|parentFiles=[%s]|grandParent=%s|grandParentFiles=[%s]",
-		exePath,
-		baseDir, strings.Join(baseFiles, ","),
-		parentDir, strings.Join(parentFiles, ","),
-		grandParentDir, strings.Join(grandParentFiles, ","))
-	log.Printf("[ResolveYtDlpPath] NOT FOUND, returning diagnostic: %s", diag)
-	return diag
-}
-
-// debugPrintDir is no longer needed - diagnostic info is returned directly
-func debugPrintDir(dir string, depth int) {
-	// Deprecated: diagnostic info is now returned directly in ResolveYtDlpPath
+	log.Printf("[ResolveYtDlpPath] %s", diag.String())
+	return diag.String()
 }
 
 func envOrInt(key string, fallback int) int {
