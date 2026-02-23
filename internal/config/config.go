@@ -67,22 +67,21 @@ func envOr(key, fallback string) string {
 }
 
 // ResolveYtDlpPath tries to find yt-dlp in the same directory as the executable.
-// On Android, the executable is in nativeLibraryDir, where jniLibs are extracted.
+// On Android, the executable is in nativeLibraryDir (e.g., lib/arm64-v8a/ or lib/arm64/).
 // This function handles multiple possible extraction paths for different Android ROMs.
 func ResolveYtDlpPath(fallback string) string {
-	// 1. Get current executable path (usually .../lib/arm64-v8a/ or .../lib/arm64/)
+	// 1. Get current .so running directory
 	exePath, err := os.Executable()
 	if err != nil {
 		return fallback
 	}
 	baseDir := filepath.Dir(exePath)
 
-	// 2. Construct search priority list
-	// Priority: same directory, then parent lib directory with architecture folders
+	// 2. Construct high-priority search list, covering arm64-v8a physical path
 	searchPaths := []string{
-		filepath.Join(baseDir, "libytdlp.so"),                           // Same directory
-		filepath.Join(baseDir, "..", "lib", "arm64-v8a", "libytdlp.so"), // Cross-directory fallback
-		filepath.Join(baseDir, "..", "lib", "arm64", "libytdlp.so"),     // Compatible shorthand directory
+		filepath.Join(baseDir, "libytdlp.so"),                    // Scenario A: directly in current directory
+		filepath.Join(baseDir, "..", "arm64-v8a", "libytdlp.so"), // Scenario B: in sibling v8a directory
+		filepath.Join(baseDir, "..", "arm64", "libytdlp.so"),     // Scenario C: in sibling shorthand directory
 	}
 
 	for _, p := range searchPaths {
@@ -91,15 +90,10 @@ func ResolveYtDlpPath(fallback string) string {
 		}
 	}
 
-	// 3. Ultimate fuzzy matching: recursively find libytdlp.so in baseDir and parent directories
-	// Solves some modified ROM extraction paths
-	matches, _ := filepath.Glob(filepath.Join(baseDir, "*", "libytdlp.so"))
-	if len(matches) > 0 {
-		return matches[0]
-	}
-
-	// Also try parent lib directories
-	matches, _ = filepath.Glob(filepath.Join(baseDir, "..", "lib", "*", "libytdlp.so"))
+	// 3. Ultimate fuzzy search: recursively find all libytdlp.so files under nativeLibraryDir's parent directory
+	// This solves the problem of inconsistent extraction paths across different manufacturers
+	parentDir := filepath.Dir(baseDir)
+	matches, _ := filepath.Glob(filepath.Join(parentDir, "*", "libytdlp.so"))
 	if len(matches) > 0 {
 		return matches[0]
 	}
