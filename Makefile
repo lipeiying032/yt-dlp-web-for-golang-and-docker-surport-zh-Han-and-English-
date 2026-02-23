@@ -8,12 +8,12 @@ PLATFORMS := \
 	windows/386/.exe \
 	windows/arm64/.exe \
 	darwin/amd64/ \
-	darwin/arm64/
+	darwin/arm64/ 	linux/amd64/ 	linux/arm64/
 
 .PHONY: build clean release
 
 build:
-	go build -ldflags="$(LDFLAGS)" -trimpath -o $(DIST)/$(APP) .
+	CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -trimpath -o $(DIST)/$(APP) .
 
 clean:
 	rm -rf $(DIST)

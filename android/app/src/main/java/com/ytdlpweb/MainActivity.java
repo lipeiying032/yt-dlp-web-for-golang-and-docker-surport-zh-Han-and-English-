@@ -83,6 +83,7 @@ public class MainActivity extends Activity {
         Runnable pollServer = new Runnable() {
             @Override
             public void run() {
+                final Runnable self = this;
                 new Thread(() -> {
                     try {
                         java.net.HttpURLConnection c = (java.net.HttpURLConnection)
@@ -94,11 +95,11 @@ public class MainActivity extends Activity {
                             return;
                         }
                     } catch (Exception ignored) {}
-                    handler.postDelayed(this, 300);
+                    handler.postDelayed(self, 500);
                 }).start();
             }
         };
-        handler.postDelayed(pollServer, 500);
+        handler.postDelayed(pollServer, 800);
     }
     
     @Override

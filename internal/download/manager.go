@@ -57,13 +57,13 @@ func (m *Manager) Submit(t *Task) {
 }
 
 // List returns all tasks sorted newest-first.
-func (m *Manager) List() []*Task {
+func (m *Manager) List() []map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	out := make([]*Task, 0, len(m.order))
+	out := make([]map[string]interface{}, 0, len(m.order))
 	for i := len(m.order) - 1; i >= 0; i-- {
 		if t, ok := m.tasks[m.order[i]]; ok {
-			out = append(out, t)
+			out = append(out, t.Snapshot())
 		}
 	}
 	return out
@@ -84,7 +84,6 @@ func (m *Manager) Cancel(id string) error {
 		return fmt.Errorf("not found")
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	switch t.Status {
 	case StatusRunning:
 		if t.cancel != nil {
@@ -97,9 +96,11 @@ func (m *Manager) Cancel(id string) error {
 			t.cancel()
 		}
 	default:
+		t.mu.Unlock()
 		return fmt.Errorf("cannot cancel task in state %s", t.Status)
 	}
 	t.UpdatedAt = time.Now()
+	t.mu.Unlock()
 	m.broadcast(t)
 	return nil
 }
@@ -111,8 +112,8 @@ func (m *Manager) Pause(id string) error {
 		return fmt.Errorf("not found")
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if t.Status != StatusRunning {
+		t.mu.Unlock()
 		return fmt.Errorf("not running")
 	}
 	if t.cancel != nil {
@@ -120,6 +121,7 @@ func (m *Manager) Pause(id string) error {
 	}
 	t.Status = StatusPaused
 	t.UpdatedAt = time.Now()
+	t.mu.Unlock()
 	m.broadcast(t)
 	return nil
 }
@@ -131,13 +133,14 @@ func (m *Manager) Resume(id string) error {
 		return fmt.Errorf("not found")
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if t.Status != StatusPaused && t.Status != StatusFailed {
+		t.mu.Unlock()
 		return fmt.Errorf("not paused/failed")
 	}
 	t.Status = StatusQueued
 	t.Error = ""
 	t.UpdatedAt = time.Now()
+	t.mu.Unlock()
 	m.broadcast(t)
 	// non-blocking send
 	select {
@@ -154,7 +157,6 @@ func (m *Manager) Retry(id string) error {
 		return fmt.Errorf("not found")
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.Status = StatusQueued
 	t.Progress = "0%"
 	t.Percent = 0
@@ -163,6 +165,7 @@ func (m *Manager) Retry(id string) error {
 	t.Error = ""
 	t.Logs = t.Logs[:0]
 	t.UpdatedAt = time.Now()
+	t.mu.Unlock()
 	m.broadcast(t)
 	select {
 	case m.queue <- t.ID:
@@ -308,14 +311,14 @@ func (m *Manager) execute(t *Task) {
 	// If user specified -o, skip the default -o from DefaultArgs
 	hasUserOutput := false
 	for _, a := range t.Args {
-		if a == "-o" {
+		if a == "-o" || a == "--output" {
 			hasUserOutput = true
 			break
 		}
 	}
 	args := make([]string, 0, len(m.cfg.DefaultArgs)+len(t.Args)+1)
 	for i := 0; i < len(m.cfg.DefaultArgs); i++ {
-		if m.cfg.DefaultArgs[i] == "-o" && hasUserOutput {
+		if m.cfg.DefaultArgs[i] == "-o" && hasUserOutput && i+1 < len(m.cfg.DefaultArgs) {
 			i++ // skip -o and its value
 			continue
 		}
@@ -433,7 +436,9 @@ func (m *Manager) Stats() map[string]int {
 	defer m.mu.RUnlock()
 	counts := map[string]int{"total": len(m.tasks)}
 	for _, t := range m.tasks {
+		t.mu.Lock()
 		counts[string(t.Status)]++
+		t.mu.Unlock()
 	}
 	return counts
 }

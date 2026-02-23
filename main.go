@@ -120,7 +120,10 @@ func main() {
 			Index:    "index.html",
 		})
 	} else {
-		subFS, _ := fs.Sub(staticFS, "static")
+		subFS, err := fs.Sub(staticFS, "static")
+		if err != nil {
+			log.Fatalf("failed to load embedded static files: %v", err)
+		}
 		app.Use("/", filesystem.New(filesystem.Config{
 			Root:         http.FS(subFS),
 			Browse:       false,

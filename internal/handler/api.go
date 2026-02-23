@@ -50,8 +50,9 @@ func (a *API) submitDownload(c *fiber.Ctx) error {
 	}
 
 	task := download.NewTask(url, args)
+	snap := task.Snapshot()
 	a.mgr.Submit(task)
-	return c.JSON(fiber.Map{"ok": true, "task": task})
+	return c.JSON(fiber.Map{"ok": true, "task": snap})
 }
 
 func (a *API) listTasks(c *fiber.Ctx) error {

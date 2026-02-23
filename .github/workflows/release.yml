@@ -69,13 +69,17 @@ jobs:
           elif [ "${{ matrix.goarch }}" = "arm64" ]; then
             FF_ARCH="winarm64"
           else
-            FF_ARCH="win32"
+            echo "No FFmpeg build available for 386, skipping..."
+            FF_ARCH=""
           fi
-          wget -q "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${FF_ARCH}-gpl.zip" -O ffmpeg.zip
-          unzip -q -j ffmpeg.zip "*/bin/ffmpeg.exe" "*/bin/ffprobe.exe"
-          rm ffmpeg.zip
-          
-          zip -9 "${ARCHIVE}" "${BINARY}" "yt-dlp.exe" "ffmpeg.exe" "ffprobe.exe"
+          if [ -n "${FF_ARCH}" ]; then
+            wget -q "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${FF_ARCH}-gpl.zip" -O ffmpeg.zip
+            unzip -q -j ffmpeg.zip "*/bin/ffmpeg.exe" "*/bin/ffprobe.exe"
+            rm ffmpeg.zip
+            zip -9 "${ARCHIVE}" "${BINARY}" "yt-dlp.exe" "ffmpeg.exe" "ffprobe.exe"
+          else
+            zip -9 "${ARCHIVE}" "${BINARY}" "yt-dlp.exe"
+          fi
 
       - name: Archive (macOS/Linux → tar.gz)
         if: matrix.goos == 'darwin' || matrix.goos == 'linux'

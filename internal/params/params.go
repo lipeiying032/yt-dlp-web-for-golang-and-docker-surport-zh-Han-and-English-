@@ -164,7 +164,10 @@ func buildUI(req *DownloadRequest) []string {
 		a = append(a, "--concurrent-fragments", req.ConcFrags)
 	}
 	if req.OutputTmpl != "" {
-		a = append(a, "-o", req.OutputTmpl)
+		// Block path traversal and absolute paths
+		if !strings.Contains(req.OutputTmpl, "..") && !strings.HasPrefix(req.OutputTmpl, "/") && !strings.Contains(req.OutputTmpl, ":\\") {
+			a = append(a, "-o", req.OutputTmpl)
+		}
 	}
 	if req.ExtractorArgs != "" {
 		a = append(a, "--extractor-args", req.ExtractorArgs)

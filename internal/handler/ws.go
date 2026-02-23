@@ -25,17 +25,15 @@ func NewHub() *Hub {
 
 // Register adds a client and sends the current task list.
 func (h *Hub) Register(c *websocket.Conn, mgr *download.Manager) {
-	h.mu.Lock()
-	h.clients[c] = true
-	h.mu.Unlock()
-
-	// Send initial task list
 	tasks := mgr.List()
 	data, _ := json.Marshal(map[string]interface{}{
 		"type":  "init",
 		"tasks": tasks,
 	})
+	h.mu.Lock()
+	h.clients[c] = true
 	_ = c.WriteMessage(websocket.TextMessage, data)
+	h.mu.Unlock()
 }
 
 // Unregister removes a client.

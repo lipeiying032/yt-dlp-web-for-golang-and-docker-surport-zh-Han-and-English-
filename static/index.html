@@ -540,14 +540,17 @@
                 applyTheme() { document.documentElement.setAttribute('data-theme', this.dark ? 'ytdlp-dark' : 'ytdlp-light'); },
                 toggleLang() { this.lang = this.lang === 'en' ? 'zh' : 'en'; localStorage.setItem('lang', this.lang); },
 
+                _wsRetry: 1000,
                 connectWS() {
+                    if (this.ws) { try { this.ws.close(); } catch {} }
                     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
                     this.ws = new WebSocket(`${proto}//${location.host}/ws`);
-                    this.ws.onopen = () => { this.wsStatus = '● connected'; };
-                    this.ws.onclose = () => { this.wsStatus = '○ disconnected'; setTimeout(() => this.connectWS(), 3000); };
+                    this.ws.onopen = () => { this.wsStatus = '● connected'; this._wsRetry = 1000; };
+                    this.ws.onclose = () => { this.wsStatus = '○ disconnected'; setTimeout(() => this.connectWS(), this._wsRetry); this._wsRetry = Math.min(this._wsRetry * 2, 30000); };
                     this.ws.onerror = () => { this.wsStatus = '⚠ error'; };
                     this.ws.onmessage = (e) => {
-                        const msg = JSON.parse(e.data);
+                        let msg;
+                        try { msg = JSON.parse(e.data); } catch { return; }
                         if (msg.type === 'init') {
                             this.tasks = (msg.tasks || []).map(t => ({ ...t, _showLog: t.status === 'running' || t.status === 'failed' }));
                         } else if (msg.type === 'update') {
@@ -572,13 +575,12 @@
                         if (this.form.is_raw) { payload.args = this.form.url; payload.url = ''; }
                         const r = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         if (!r.ok) {
-                            const e = await r.json();
-                            this.showToast(e.error, 'error');
+                            const e = await r.json().catch(() => ({}));
+                            this.showToast(e.error || 'Request failed', 'error');
                             return;
                         }
                         this.showToast(this.t('taskAdded'), 'success');
-                        // Intentionally keeping URL around for easier back-to-back downloads or accidental clicks
-                    } finally { this.loading = false; }
+                    } catch (e) { this.showToast('Network error: ' + e.message, 'error'); } finally { this.loading = false; }
                 },
 
                 async showFormats() {
@@ -595,12 +597,12 @@
                     } catch (e) { this.formatOutput = 'Error: ' + e.message; }
                 },
 
-                async cancel(id) { await fetch(`/api/tasks/${id}/cancel`, { method: 'POST' }); },
-                async pause(id) { await fetch(`/api/tasks/${id}/pause`, { method: 'POST' }); },
-                async resume(id) { await fetch(`/api/tasks/${id}/resume`, { method: 'POST' }); },
-                async retry(id) { await fetch(`/api/tasks/${id}/retry`, { method: 'POST' }); },
-                async del(id) { await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); this.tasks = this.tasks.filter(t => t.id !== id); },
-                async clearDone() { await fetch('/api/clear-completed', { method: 'POST' }); this.tasks = this.tasks.filter(t => !['completed', 'failed', 'cancelled'].includes(t.status)); },
+                async cancel(id) { try { const r = await fetch(`/api/tasks/${id}/cancel`, { method: 'POST' }); if (!r.ok) this.showToast('Cancel failed', 'error'); } catch(e) { this.showToast(e.message, 'error'); } },
+                async pause(id) { try { const r = await fetch(`/api/tasks/${id}/pause`, { method: 'POST' }); if (!r.ok) this.showToast('Pause failed', 'error'); } catch(e) { this.showToast(e.message, 'error'); } },
+                async resume(id) { try { const r = await fetch(`/api/tasks/${id}/resume`, { method: 'POST' }); if (!r.ok) this.showToast('Resume failed', 'error'); } catch(e) { this.showToast(e.message, 'error'); } },
+                async retry(id) { try { const r = await fetch(`/api/tasks/${id}/retry`, { method: 'POST' }); if (!r.ok) this.showToast('Retry failed', 'error'); } catch(e) { this.showToast(e.message, 'error'); } },
+                async del(id) { try { const r = await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); if (r.ok) this.tasks = this.tasks.filter(t => t.id !== id); else this.showToast('Delete failed', 'error'); } catch(e) { this.showToast(e.message, 'error'); } },
+                async clearDone() { try { const r = await fetch('/api/clear-completed', { method: 'POST' }); if (r.ok) this.tasks = this.tasks.filter(t => !['completed', 'failed', 'cancelled'].includes(t.status)); else this.showToast('Clear failed', 'error'); } catch(e) { this.showToast(e.message, 'error'); } },
 
                 statusBadge(s) {
                     return { queued: 'badge-ghost', running: 'badge-primary animate-pulse', completed: 'badge-success', failed: 'badge-error', cancelled: 'badge-warning', paused: 'badge-info' }[s] || 'badge-ghost';

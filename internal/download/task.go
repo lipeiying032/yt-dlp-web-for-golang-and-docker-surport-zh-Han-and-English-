@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
+	"crypto/rand"
+	"encoding/hex"
 )
 
 // TaskStatus represents the lifecycle state of a download task.
@@ -45,10 +46,16 @@ type Task struct {
 	mu     sync.Mutex         `json:"-"`
 }
 
+func randomID() string {
+	b := make([]byte, 6)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 // NewTask creates a queued task ready for submission.
 func NewTask(url string, args []string) *Task {
 	return &Task{
-		ID:        uuid.New().String()[:12],
+		ID:        randomID(),
 		URL:       url,
 		Title:     url, // will be overwritten when yt-dlp emits metadata
 		Status:    StatusQueued,
@@ -61,7 +68,7 @@ func NewTask(url string, args []string) *Task {
 	}
 }
 
-/// Snapshot returns a JSON-safe copy of the task under lock.
+// Snapshot returns a JSON-safe copy of the task under lock.
 func (t *Task) Snapshot() map[string]interface{} {
 	t.mu.Lock()
 	defer t.mu.Unlock()
