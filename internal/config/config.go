@@ -73,9 +73,20 @@ func ResolveYtDlpPath(fallback string) string {
 	// 1. Get current .so running directory
 	exePath, err := os.Executable()
 	if err != nil {
+		log.Printf("[ResolveYtDlpPath] os.Executable() error: %v", err)
 		return fallback
 	}
 	baseDir := filepath.Dir(exePath)
+	log.Printf("[ResolveYtDlpPath] exePath=%s, baseDir=%s", exePath, baseDir)
+
+	// Debug: print all files in baseDir and parent directories
+	debugPrintDir(baseDir, 0)
+	parentDir := filepath.Dir(baseDir)
+	log.Printf("[ResolveYtDlpPath] parentDir=%s", parentDir)
+	debugPrintDir(parentDir, 1)
+	grandParentDir := filepath.Dir(parentDir)
+	log.Printf("[ResolveYtDlpPath] grandParentDir=%s", grandParentDir)
+	debugPrintDir(grandParentDir, 2)
 
 	// 2. Construct high-priority search list, covering arm64-v8a physical path
 	searchPaths := []string{
@@ -85,15 +96,27 @@ func ResolveYtDlpPath(fallback string) string {
 	}
 
 	for _, p := range searchPaths {
+		absP, _ := filepath.Abs(p)
+		log.Printf("[ResolveYtDlpPath] trying path: %s (abs: %s)", p, absP)
 		if _, err := os.Stat(p); err == nil {
+			log.Printf("[ResolveYtDlpPath] FOUND: %s", p)
 			return p
+		} else {
+			log.Printf("[ResolveYtDlpPath] stat error: %v", err)
 		}
 	}
 
 	// 3. Ultimate fuzzy search: recursively find all libytdlp.so files under nativeLibraryDir's parent directory
 	// This solves the problem of inconsistent extraction paths across different manufacturers
-	parentDir := filepath.Dir(baseDir)
 	matches, _ := filepath.Glob(filepath.Join(parentDir, "*", "libytdlp.so"))
+	log.Printf("[ResolveYtDlpPath] Glob matches in parentDir/*: %v", matches)
+	if len(matches) > 0 {
+		return matches[0]
+	}
+
+	// Also try deeper search
+	matches, _ = filepath.Glob(filepath.Join(parentDir, "*", "*", "libytdlp.so"))
+	log.Printf("[ResolveYtDlpPath] Glob matches in parentDir/*/*: %v", matches)
 	if len(matches) > 0 {
 		return matches[0]
 	}
@@ -106,7 +129,30 @@ func ResolveYtDlpPath(fallback string) string {
 		}
 	}
 
+	log.Printf("[ResolveYtDlpPath] NOT FOUND, returning fallback: %s", fallback)
 	return fallback
+}
+
+// debugPrintDir prints all files in a directory recursively for debugging
+func debugPrintDir(dir string, depth int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Printf("[debugPrintDir] depth=%d, dir=%s, error: %v", depth, dir, err)
+		return
+	}
+	log.Printf("[debugPrintDir] depth=%d, dir=%s, entries=%d", depth, dir, len(entries))
+	for _, entry := range entries {
+		fullPath := filepath.Join(dir, entry.Name())
+		if entry.IsDir() {
+			log.Printf("[debugPrintDir]   [DIR]  %s", entry.Name())
+			if depth < 2 {
+				debugPrintDir(fullPath, depth+1)
+			}
+		} else {
+			info, _ := entry.Info()
+			log.Printf("[debugPrintDir]   [FILE] %s (size=%d)", entry.Name(), info.Size())
+		}
+	}
 }
 
 func envOrInt(key string, fallback int) int {
