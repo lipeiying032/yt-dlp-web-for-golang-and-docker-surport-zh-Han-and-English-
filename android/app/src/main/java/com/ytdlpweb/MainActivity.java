@@ -199,23 +199,3 @@ public class MainActivity extends Activity {
         }
     }
 }
-
-    private void extractAsset(String assetName, File target) {
-        if (target.exists()) {
-            target.delete();
-        }
-        try (java.io.InputStream is = getAssets().open(assetName);
-             java.io.FileOutputStream fos = new java.io.FileOutputStream(target)) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) != -1) {
-                fos.write(buf, 0, n);
-            }
-            target.setExecutable(true, false);
-            target.setReadable(true, false);
-            Log.i(TAG, "Extracted asset: " + assetName + " -> " + target.getAbsolutePath());
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to extract asset " + assetName + ": " + e.getMessage());
-        }
-    }
-}
