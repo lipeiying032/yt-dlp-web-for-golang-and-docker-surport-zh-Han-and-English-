@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -386,6 +387,10 @@ func (m *Manager) execute(t *Task) {
 			return
 		}
 	}
+
+	// Log yt-dlp path for debugging
+	log.Printf("[execute] YtDlpPath=%s", m.cfg.YtDlpPath)
+	log.Printf("[execute] args=%v", args)
 
 	// Ensure download & cache dirs exist before every execution.
 	// On Android the dirs may vanish after startup (storage cleanup, permission changes).
