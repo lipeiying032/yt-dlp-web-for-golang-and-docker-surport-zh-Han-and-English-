@@ -73,7 +73,7 @@ func ResolveYtDlpPath(fallback string) string {
 		return fallback
 	}
 	dir := filepath.Dir(exePath)
-	for _, name := range []string{"yt-dlp.exe", "yt-dlp"} {
+	for _, name := range []string{"yt-dlp.exe", "yt-dlp", "libytdlp.so"} {
 		p := filepath.Join(dir, name)
 		if _, err := os.Stat(p); err == nil {
 			return p
