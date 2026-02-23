@@ -49,8 +49,8 @@ func (h *Hub) Unregister(c *websocket.Conn) {
 // Uses a full Mutex (not RLock) to safely handle client removal on error.
 func (h *Hub) BroadcastTask(t *download.Task) {
 	data, err := json.Marshal(map[string]interface{}{
-		"type": "update",
-		"task": t,
+		"type":  "update",
+		"task": t.Snapshot(),
 	})
 	if err != nil {
 		return

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"yt-dlp-web/internal/download"
 	"yt-dlp-web/internal/params"
 
@@ -42,6 +44,9 @@ func (a *API) submitDownload(c *fiber.Ctx) error {
 	url, args := params.BuildArgs(&req)
 	if url == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "URL is required"})
+	}
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return c.Status(400).JSON(fiber.Map{"error": "URL must start with http:// or https://"})
 	}
 
 	task := download.NewTask(url, args)
@@ -95,6 +100,9 @@ func (a *API) listFormats(c *fiber.Ctx) error {
 	}
 	if err := c.BodyParser(&body); err != nil || body.URL == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "url required"})
+	}
+	if !strings.HasPrefix(body.URL, "http://") && !strings.HasPrefix(body.URL, "https://") {
+		return c.Status(400).JSON(fiber.Map{"error": "URL must start with http:// or https://"})
 	}
 	extra := params.SplitShell(body.Args)
 	out, err := a.mgr.ListFormats(body.URL, extra)

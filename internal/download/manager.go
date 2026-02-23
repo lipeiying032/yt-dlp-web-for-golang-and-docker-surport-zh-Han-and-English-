@@ -49,7 +49,11 @@ func (m *Manager) Submit(t *Task) {
 	m.order = append(m.order, t.ID)
 	m.mu.Unlock()
 	m.broadcast(t)
-	m.queue <- t.ID
+	select {
+	case m.queue <- t.ID:
+	default:
+		m.failTask(t, fmt.Errorf("queue full, try again later"))
+	}
 }
 
 // List returns all tasks sorted newest-first.
@@ -301,8 +305,22 @@ func (m *Manager) execute(t *Task) {
 	m.broadcast(t)
 
 	// Build args: defaults + user args + URL
+	// If user specified -o, skip the default -o from DefaultArgs
+	hasUserOutput := false
+	for _, a := range t.Args {
+		if a == "-o" {
+			hasUserOutput = true
+			break
+		}
+	}
 	args := make([]string, 0, len(m.cfg.DefaultArgs)+len(t.Args)+1)
-	args = append(args, m.cfg.DefaultArgs...)
+	for i := 0; i < len(m.cfg.DefaultArgs); i++ {
+		if m.cfg.DefaultArgs[i] == "-o" && hasUserOutput {
+			i++ // skip -o and its value
+			continue
+		}
+		args = append(args, m.cfg.DefaultArgs[i])
+	}
 	args = append(args, t.Args...)
 	args = append(args, t.URL)
 
@@ -361,7 +379,10 @@ func (m *Manager) execute(t *Task) {
 
 	for line := range lines {
 		t.AddLog(line) // AddLog has its own lock
-		if ParseLine(line, t) {
+		t.mu.Lock()
+		changed := ParseLine(line, t)
+		t.mu.Unlock()
+		if changed {
 			m.broadcast(t)
 		}
 	}

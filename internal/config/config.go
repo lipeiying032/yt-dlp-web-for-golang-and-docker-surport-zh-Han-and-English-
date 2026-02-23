@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -27,33 +28,8 @@ func Load() *Config {
 		YtDlpPath:     envOr("YTDLP_PATH", "yt-dlp"),
 	}
 
-	// Try to find yt-dlp in the same directory as the executable, useful for portable zero-config setups
-	// Only do this if YTDLP_PATH wasn't explicitly overridden (meaning it's the exact string "yt-dlp" default)
 	if cfg.YtDlpPath == "yt-dlp" {
-		if exePath, err := os.Executable(); err == nil {
-			importPath := func(name string) string {
-				// Get the directory of the executable
-				for i := len(exePath) - 1; i >= 0 && !os.IsPathSeparator(exePath[i]); i-- {
-					if i == 0 {
-						return name
-					}
-				}
-				// extract dir safely
-				dir := ""
-				for i := len(exePath) - 1; i >= 0; i-- {
-					if os.IsPathSeparator(exePath[i]) {
-						dir = exePath[:i]
-						break
-					}
-				}
-				return dir + string(os.PathSeparator) + name
-			}
-			if _, err := os.Stat(importPath("yt-dlp.exe")); err == nil {
-				cfg.YtDlpPath = importPath("yt-dlp.exe")
-			} else if _, err := os.Stat(importPath("yt-dlp")); err == nil {
-				cfg.YtDlpPath = importPath("yt-dlp")
-			}
-		}
+		cfg.YtDlpPath = ResolveYtDlpPath(cfg.YtDlpPath)
 	}
 
 	_ = os.MkdirAll(cfg.DownloadDir, 0o755)
@@ -81,6 +57,22 @@ func Load() *Config {
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+// ResolveYtDlpPath tries to find yt-dlp in the same directory as the executable.
+func ResolveYtDlpPath(fallback string) string {
+	exePath, err := os.Executable()
+	if err != nil {
+		return fallback
+	}
+	dir := filepath.Dir(exePath)
+	for _, name := range []string{"yt-dlp.exe", "yt-dlp"} {
+		p := filepath.Join(dir, name)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
 	}
 	return fallback
 }

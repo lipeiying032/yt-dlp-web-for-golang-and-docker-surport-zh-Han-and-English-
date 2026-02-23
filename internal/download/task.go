@@ -48,7 +48,7 @@ type Task struct {
 // NewTask creates a queued task ready for submission.
 func NewTask(url string, args []string) *Task {
 	return &Task{
-		ID:        uuid.New().String()[:8],
+		ID:        uuid.New().String()[:12],
 		URL:       url,
 		Title:     url, // will be overwritten when yt-dlp emits metadata
 		Status:    StatusQueued,
@@ -58,6 +58,19 @@ func NewTask(url string, args []string) *Task {
 		Logs:      make([]string, 0, 64),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+	}
+}
+
+/// Snapshot returns a JSON-safe copy of the task under lock.
+func (t *Task) Snapshot() map[string]interface{} {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return map[string]interface{}{
+		"id": t.ID, "url": t.URL, "title": t.Title,
+		"status": t.Status, "progress": t.Progress, "percent": t.Percent,
+		"size": t.Size, "speed": t.Speed, "eta": t.ETA,
+		"filename": t.Filename, "error": t.Error, "logs": t.Logs,
+		"args": t.Args, "created_at": t.CreatedAt, "updated_at": t.UpdatedAt,
 	}
 }
 

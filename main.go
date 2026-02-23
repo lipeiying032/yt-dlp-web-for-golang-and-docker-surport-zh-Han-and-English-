@@ -29,7 +29,7 @@ var staticFS embed.FS
 func main() {
 	// CLI fallback: if any args given, pass straight to yt-dlp
 	if len(os.Args) > 1 {
-		ytdlp := "yt-dlp"
+		ytdlp := config.ResolveYtDlpPath("yt-dlp")
 		if p := os.Getenv("YTDLP_PATH"); p != "" {
 			ytdlp = p
 		}
