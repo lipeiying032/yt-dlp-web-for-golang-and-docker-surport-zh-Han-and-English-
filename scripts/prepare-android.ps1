@@ -4,6 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 $JniLibsBase = Join-Path $PSScriptRoot "..\android\app\src\main\jniLibs"
+$AssetsBin = Join-Path $PSScriptRoot "..\android\app\src\main\assets\bin"
 
 $ABIs = @{
     "arm64-v8a" = "arm64"
@@ -14,8 +15,13 @@ $ABIs = @{
 
 $YtDlpUrls = @{
     "arm64-v8a" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64"
-    "armeabi-v7a" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_armv7l"
+    "armeabi-v7a" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_armv7l.zip"
     "x86_64" = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+}
+
+# Create assets/bin directory
+if (-not (Test-Path $AssetsBin)) {
+    New-Item -ItemType Directory -Path $AssetsBin -Force | Out-Null
 }
 
 Write-Host "Building Go server for Android ABIs..."
@@ -42,12 +48,20 @@ foreach ($abi in $ABIs.Keys) {
     
     go build -ldflags="-s -w" -trimpath -o $outFile .
 
-    # yt-dlp -> jniLibs (nativeLibraryDir has exec permission)
+    # yt-dlp -> assets (extracted at runtime by MainActivity to codeCacheDir)
     if ($YtDlpUrls.ContainsKey($abi)) {
-        $ytdlpFile = Join-Path $abiDir "libytdlp.so"
+        $ytdlpFile = Join-Path $AssetsBin "yt-dlp_$abi"
         if (-not (Test-Path $ytdlpFile)) {
             Write-Host "Downloading yt-dlp for $abi..."
-            Invoke-WebRequest -Uri $YtDlpUrls[$abi] -OutFile $ytdlpFile
+            $tmpFile = Join-Path $env:TEMP "ytdlp_$abi"
+            Invoke-WebRequest -Uri $YtDlpUrls[$abi] -OutFile $tmpFile
+            
+            if ($YtDlpUrls[$abi] -like "*.zip") {
+                Expand-Archive -Path $tmpFile -DestinationPath (Join-Path $env:TEMP "ytdlp_extract_$abi") -Force
+                Move-Item -Path (Join-Path $env:TEMP "ytdlp_extract_$abi\yt-dlp_linux_armv7l") -Destination $ytdlpFile -Force
+            } else {
+                Move-Item -Path $tmpFile -Destination $ytdlpFile -Force
+            }
         } else {
             Write-Host "yt-dlp for $abi already exists, skipping download."
         }
