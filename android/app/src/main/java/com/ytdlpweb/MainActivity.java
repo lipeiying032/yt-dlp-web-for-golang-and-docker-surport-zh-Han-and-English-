@@ -30,17 +30,28 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
-                // Binaries are in nativeLibraryDir as .so files (has exec permission)
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
                 File ytDlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
-                    String msg = "Server binary not found: " + serverFile.getAbsolutePath();
-                    Log.e(TAG, msg);
-                    handler.post(() -> webView.loadData(
-                        "<h2>" + msg + "</h2>", "text/html", "utf-8"));
+                    showError("Server binary not found: " + serverFile.getAbsolutePath());
                     return;
+                }
+
+                // If yt-dlp not in nativeLibraryDir, extract from assets as fallback
+                if (!ytDlpFile.exists()) {
+                    String abi = android.os.Build.SUPPORTED_ABIS[0];
+                    String abiName;
+                    if (abi.contains("arm64") || abi.contains("aarch64")) abiName = "arm64-v8a";
+                    else if (abi.contains("x86_64")) abiName = "x86_64";
+                    else if (abi.contains("armeabi") || abi.contains("arm-v7")) abiName = "armeabi-v7a";
+                    else if (abi.contains("x86")) abiName = "x86";
+                    else { showError("Unsupported ABI: " + abi); return; }
+
+                    File fallback = new File(getFilesDir(), "yt-dlp");
+                    extractAsset("bin/yt-dlp_" + abiName, fallback);
+                    ytDlpFile = fallback;
                 }
 
                 File externalDir = getExternalFilesDir(null);
@@ -152,5 +163,24 @@ public class MainActivity extends Activity {
             serverProcess.destroyForcibly();
         }
         super.onDestroy();
+    }
+
+    private void showError(String msg) {
+        Log.e(TAG, msg);
+        handler.post(() -> webView.loadData(
+            "<h2>" + msg + "</h2>", "text/html", "utf-8"));
+    }
+
+    private void extractAsset(String assetName, File target) {
+        try (java.io.InputStream is = getAssets().open(assetName);
+             java.io.FileOutputStream fos = new java.io.FileOutputStream(target)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = is.read(buf)) != -1) fos.write(buf, 0, n);
+            target.setExecutable(true, false);
+            Log.i(TAG, "Extracted: " + target.getAbsolutePath());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to extract " + assetName + ": " + e.getMessage());
+        }
     }
 }
