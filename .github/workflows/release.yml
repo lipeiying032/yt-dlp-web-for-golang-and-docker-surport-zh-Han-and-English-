@@ -116,14 +116,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build Go server and download yt-dlp
+      - name: Build Go server and bundle Python + yt-dlp
         env:
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: arm64
         run: |
           go mod tidy
-          sudo apt-get update && sudo apt-get install -y patchelf
           
           # Only arm64-v8a
           JNILIBS="android/app/src/main/jniLibs/arm64-v8a"
@@ -133,12 +132,27 @@ jobs:
           go build -ldflags="-s -w" -trimpath -o "$JNILIBS/libytdlpweb.so" .
           echo "Built server for arm64-v8a"
           
-          # yt-dlp
-          wget -q "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64" -O "$JNILIBS/libytdlp.so"
-          patchelf --set-soname libytdlp.so "$JNILIBS/libytdlp.so" || true
-          chmod +x "$JNILIBS/libytdlp.so"
-          echo "yt-dlp ready for arm64-v8a"
-          ls -la "$JNILIBS/"
+          # Download Python 3.14 for Android (official embeddable)
+          echo "Downloading Python 3.14 for Android..."
+          mkdir -p "android/app/src/main/assets"
+          wget -q "https://www.python.org/ftp/python/3.14.2/python-3.14.2-embed-aarch64.tar.xz" -O "/tmp/python-android.tar.xz" || \
+            wget -q "https://www.python.org/ftp/python/3.14.1/python-3.14.1-embed-aarch64.tar.xz" -O "/tmp/python-android.tar.xz"
+          
+          if [ -f /tmp/python-android.tar.xz ]; then
+            tar -xf /tmp/python-android.tar.xz -C "android/app/src/main/assets/"
+            chmod +x "android/app/src/main/assets/"*/python3* 2>/dev/null || true
+            echo "Python3 ready"
+            ls -la "android/app/src/main/assets/"
+          else
+            echo "Python download failed"
+          fi
+          
+          # Download yt-dlp Python script
+          echo "Downloading yt-dlp..."
+          wget -q "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -O "android/app/src/main/assets/yt-dlp"
+          chmod +x "android/app/src/main/assets/yt-dlp"
+          echo "yt-dlp ready"
+          ls -la "android/app/src/main/assets/"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3

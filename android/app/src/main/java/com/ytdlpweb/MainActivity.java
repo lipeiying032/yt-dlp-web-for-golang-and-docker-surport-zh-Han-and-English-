@@ -33,19 +33,64 @@ public class MainActivity extends Activity {
             try {
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
-                File ytdlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
                     showError("Server not found: " + serverFile.getAbsolutePath());
                     return;
                 }
-                if (!ytdlpFile.exists()) {
-                    showError("yt-dlp binary not found. Note: On Android, please use Termux to download videos manually:\n1. Install Termux from app store\n2. Run: pkg install python yt-dlp\n3. In Termux: yt-dlp [URL]");
-                    return;
-                }
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
-                Log.i(TAG, "yt-dlp: " + ytdlpFile.getAbsolutePath());
+
+                // Check for bundled Python and yt-dlp in assets
+                File filesDir = getFilesDir();
+                File pythonDir = new File(filesDir, "assets");
+                File pythonFile = null;
+                File ytdlpFile = null;
+
+                // Extract Python if exists in assets
+                String[] assets = getAssets().list("");
+                for (String a : assets) {
+                    if (a.equals("python3") || a.startsWith("python3.")) {
+                        pythonFile = new File(pythonDir, "python3");
+                        if (!pythonFile.exists()) {
+                            getAssets().copyAsset(a, pythonFile);
+                            pythonFile.setExecutable(true, false);
+                        }
+                        break;
+                    }
+                }
+
+                // Extract yt-dlp
+                for (String a : assets) {
+                    if (a.equals("yt-dlp")) {
+                        ytdlpFile = new File(pythonDir, "yt-dlp");
+                        if (!ytdlpFile.exists()) {
+                            getAssets().copyAsset(a, ytdlpFile);
+                            ytdlpFile.setExecutable(true, false);
+                        }
+                        break;
+                    }
+                }
+
+                String ytdlpPath = "";
+                String pythonPath = "";
+                String usePython = "false";
+
+                if (pythonFile != null && pythonFile.exists() && ytdlpFile != null && ytdlpFile.exists()) {
+                    pythonPath = pythonFile.getAbsolutePath();
+                    ytdlpPath = ytdlpFile.getAbsolutePath();
+                    usePython = "true";
+                    Log.i(TAG, "Using bundled Python + yt-dlp: " + pythonPath + " " + ytdlpPath);
+                } else {
+                    // Fallback to native libytdlp.so
+                    ytdlpFile = new File(nativeDir, "libytdlp.so");
+                    if (!ytdlpFile.exists()) {
+                        showError("yt-dlp not found. Please reinstall the app.");
+                        return;
+                    }
+                    ytdlpPath = ytdlpFile.getAbsolutePath();
+                    Log.i(TAG, "Using native yt-dlp: " + ytdlpPath);
+                }
 
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
@@ -59,7 +104,11 @@ public class MainActivity extends Activity {
                 pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
-                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
+                pb.environment().put("YTDLP_PATH", ytdlpPath);
+                if (usePython.equals("true")) {
+                    pb.environment().put("PYTHON_PATH", pythonPath);
+                    pb.environment().put("USE_PYTHON", usePython);
+                }
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
