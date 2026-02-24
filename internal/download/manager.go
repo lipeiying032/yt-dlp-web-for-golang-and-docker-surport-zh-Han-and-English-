@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -389,18 +388,12 @@ func (m *Manager) execute(t *Task) {
 	}
 
 	// Ensure download & cache dirs exist before every execution.
+	// On Android the dirs may vanish after startup (storage cleanup, permission changes).
 	os.MkdirAll(m.cfg.DownloadDir, 0o755)
 	os.MkdirAll(filepath.Join(m.cfg.ConfigDir, "cache"), 0o755)
 
-	var cmd *exec.Cmd
-	if m.cfg.UsePython && m.cfg.PythonPath != "" {
-		log.Printf("[execute] Using Python: %s %s %v", m.cfg.PythonPath, m.cfg.YtDlpPath, args)
-		cmd = exec.CommandContext(ctx, m.cfg.PythonPath, append([]string{m.cfg.YtDlpPath}, args...)...)
-	} else {
-		log.Printf("[execute] YtDlpPath=%s args=%v", m.cfg.YtDlpPath, args)
-		cmd = exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
-	}
-	cmd.Dir = m.cfg.DownloadDir
+	cmd := exec.CommandContext(ctx, m.cfg.YtDlpPath, args...)
+	cmd.Dir = m.cfg.DownloadDir // yt-dlp resolves relative -o paths from cwd
 	cmd.Env = append(os.Environ(),
 		"XDG_CACHE_HOME="+m.cfg.ConfigDir+"/cache",
 		"XDG_CONFIG_HOME="+m.cfg.ConfigDir,

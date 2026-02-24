@@ -33,49 +33,19 @@ public class MainActivity extends Activity {
             try {
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
+                File ytdlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
                     showError("Server not found: " + serverFile.getAbsolutePath());
                     return;
                 }
+                if (!ytdlpFile.exists()) {
+                    showError("yt-dlp binary not found. Note: On Android, please use Termux to download videos manually:\n1. Install Termux from app store\n2. Run: pkg install python yt-dlp\n3. In Termux: yt-dlp [URL]");
+                    return;
+                }
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
-
-                // Check for bundled yt-dlp in assets
-                File filesDir = getFilesDir();
-                File assetsDir = new File(filesDir, "assets");
-                File ytdlpFile = new File(assetsDir, "yt-dlp");
-
-                // Extract yt-dlp from assets
-                try {
-                    String[] assets = getAssets().list("");
-                    for (String a : assets) {
-                        if (a.equals("yt-dlp")) {
-                            if (!ytdlpFile.exists()) {
-                                getAssets().copyAsset(a, ytdlpFile);
-                                ytdlpFile.setExecutable(true, false);
-                            }
-                            break;
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed to extract yt-dlp: " + e.getMessage());
-                }
-
-                String ytdlpPath = "";
-                if (ytdlpFile.exists()) {
-                    ytdlpPath = ytdlpFile.getAbsolutePath();
-                    Log.i(TAG, "Using bundled yt-dlp: " + ytdlpPath);
-                } else {
-                    // Fallback to native libytdlp.so
-                    ytdlpFile = new File(nativeDir, "libytdlp.so");
-                    if (!ytdlpFile.exists()) {
-                        showError("yt-dlp not found. Please reinstall the app.");
-                        return;
-                    }
-                    ytdlpPath = ytdlpFile.getAbsolutePath();
-                    Log.i(TAG, "Using native yt-dlp: " + ytdlpPath);
-                }
+                Log.i(TAG, "yt-dlp: " + ytdlpFile.getAbsolutePath());
 
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
@@ -89,7 +59,7 @@ public class MainActivity extends Activity {
                 pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
-                pb.environment().put("YTDLP_PATH", ytdlpPath);
+                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 

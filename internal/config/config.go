@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 // Config holds all application configuration loaded from environment variables.
@@ -16,8 +15,6 @@ type Config struct {
 	StaticDir     string
 	MaxConcurrent int
 	YtDlpPath     string
-	PythonPath    string
-	UsePython     bool
 	DefaultArgs   []string
 }
 
@@ -30,16 +27,11 @@ func Load() *Config {
 		StaticDir:     envOr("STATIC_DIR", "./static"),
 		MaxConcurrent: envOrInt("MAX_CONCURRENT", 2),
 		YtDlpPath:     envOr("YTDLP_PATH", "yt-dlp"),
-		PythonPath:    envOr("PYTHON_PATH", ""),
 	}
 
-	if envOr("USE_PYTHON", "false") == "true" || strings.HasSuffix(cfg.YtDlpPath, ".py") {
-		cfg.UsePython = true
+	if cfg.YtDlpPath == "yt-dlp" {
+		cfg.YtDlpPath = ResolveYtDlpPath(cfg.YtDlpPath)
 	}
-
-	log.Printf("[Config] YtDlpPath=%s, PythonPath=%s, UsePython=%v", cfg.YtDlpPath, cfg.PythonPath, cfg.UsePython)
-
-	log.Printf("[Config] YtDlpPath=%s, PythonPath=%s, UsePython=%v", cfg.YtDlpPath, cfg.PythonPath, cfg.UsePython)
 
 	if err := os.MkdirAll(cfg.DownloadDir, 0o755); err != nil {
 		log.Fatalf("failed to create download dir %s: %v", cfg.DownloadDir, err)
