@@ -44,39 +44,33 @@ public class MainActivity extends Activity {
                 // Check for Termux first (best compatibility)
                 File termuxPython = new File("/data/data/com.termux/files/usr/bin/python3");
                 File termuxYtDlp = new File("/data/data/com.termux/files/usr/bin/yt-dlp");
-                String ytdlpPath = null;
-                String pythonPath = termuxPython.getAbsolutePath();
+                File ytdlpFile = new File(nativeDir, "libytdlp.so");
+                String ytdlpPath = ytdlpFile.getAbsolutePath();
+                String pythonPath = "";
                 String usePython = "false";
 
-                if (termuxPython.exists()) {
-                    if (termuxYtDlp.exists()) {
-                        ytdlpPath = termuxYtDlp.getAbsolutePath();
-                        usePython = "false";
-                        Log.i(TAG, "Using Termux yt-dlp: " + ytdlpPath);
-                    } else {
-                        // Check for yt-dlp.py in our assets
-                        File ytdlpScript = new File(getFilesDir(), "assets/yt-dlp");
-                        if (!ytdlpScript.exists()) {
-                            getAssets().copyAsset("bin/yt-dlp", ytdlpScript);
-                            ytdlpScript.setExecutable(true, false);
-                        }
-                        if (ytdlpScript.exists()) {
-                            ytdlpPath = ytdlpScript.getAbsolutePath();
-                            usePython = "true";
-                            Log.i(TAG, "Using Termux Python + yt-dlp.py: " + ytdlpPath);
-                        }
-                    }
-                }
-
-                // Fallback to libytdlp.so
-                if (ytdlpPath == null) {
-                    File ytdlpFile = new File(nativeDir, "libytdlp.so");
+                if (termuxYtDlp.exists()) {
+                    ytdlpPath = termuxYtDlp.getAbsolutePath();
+                    usePython = "false";
+                    Log.i(TAG, "Using Termux yt-dlp: " + ytdlpPath);
+                } else if (termuxPython.exists()) {
+                    // Try to find yt-dlp.py in assets or use Termux python
+                    pythonPath = termuxPython.getAbsolutePath();
+                    usePython = "true";
+                    // Fallback to native libytdlp.so if no Termux yt-dlp
                     if (!ytdlpFile.exists()) {
-                        showError("yt-dlp not found in native dir or Termux");
+                        showError("yt-dlp not found. Please install Termux and run: pkg install python yt-dlp");
+                        return;
+                    }
+                    Log.i(TAG, "Using Termux Python + native yt-dlp");
+                } else {
+                    // Fallback to libytdlp.so
+                    if (!ytdlpFile.exists()) {
+                        showError("yt-dlp not found. Please install Termux and run: pkg install python yt-dlp");
                         return;
                     }
                     ytdlpPath = ytdlpFile.getAbsolutePath();
-                    Log.i(TAG, "yt-dlp (binary): " + ytdlpPath);
+                    Log.i(TAG, "yt-dlp: " + ytdlpPath);
                 }
 
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -92,31 +86,10 @@ public class MainActivity extends Activity {
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
                 pb.environment().put("YTDLP_PATH", ytdlpPath);
-                pb.environment().put("PYTHON_PATH", pythonPath);
-                pb.environment().put("USE_PYTHON", usePython);
-                pb.directory(getFilesDir());
-                    File ytdlpFile = new File(nativeDir, "libytdlp.so");
-                    if (!ytdlpFile.exists()) {
-                        showError("yt-dlp not found: " + ytdlpFile.getAbsolutePath());
-                        return;
-                    }
-                    ytdlpPath = ytdlpFile.getAbsolutePath();
-                    Log.i(TAG, "yt-dlp (binary): " + ytdlpPath);
+                if (!pythonPath.isEmpty()) {
+                    pb.environment().put("PYTHON_PATH", pythonPath);
+                    pb.environment().put("USE_PYTHON", usePython);
                 }
-
-                File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
-                if (!ytdlpDownloadDir.exists()) ytdlpDownloadDir.mkdirs();
-
-                String configDir = getFilesDir().getAbsolutePath() + "/config";
-                new File(configDir).mkdirs();
-
-                ProcessBuilder pb = new ProcessBuilder(serverFile.getAbsolutePath());
-                pb.environment().put("PORT", "8080");
-                pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
-                pb.environment().put("CONFIG_DIR", configDir);
-                pb.environment().put("STATIC_DIR", "");
-                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
@@ -216,10 +189,5 @@ public class MainActivity extends Activity {
         Log.e(TAG, msg);
         handler.post(() -> webView.loadData(
             "<h2>" + msg + "</h2>", "text/html", "utf-8"));
-    }
-}
-        } finally {
-            in.close();
-        }
     }
 }
