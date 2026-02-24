@@ -41,36 +41,42 @@ public class MainActivity extends Activity {
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
 
-                // Check for Termux first (best compatibility)
-                File termuxPython = new File("/data/data/com.termux/files/usr/bin/python3");
-                File termuxYtDlp = new File("/data/data/com.termux/files/usr/bin/yt-dlp");
-                File ytdlpFile = new File(nativeDir, "libytdlp.so");
-                String ytdlpPath = ytdlpFile.getAbsolutePath();
+                // Check for Termux using package manager (works through Android sandbox)
+                String ytdlpPath;
                 String pythonPath = "";
                 String usePython = "false";
-
-                if (termuxYtDlp.exists()) {
-                    ytdlpPath = termuxYtDlp.getAbsolutePath();
-                    usePython = "false";
-                    Log.i(TAG, "Using Termux yt-dlp: " + ytdlpPath);
-                } else if (termuxPython.exists()) {
-                    // Try to find yt-dlp.py in assets or use Termux python
-                    pythonPath = termuxPython.getAbsolutePath();
-                    usePython = "true";
-                    // Fallback to native libytdlp.so if no Termux yt-dlp
-                    if (!ytdlpFile.exists()) {
-                        showError("yt-dlp not found. Please install Termux and run: pkg install python yt-dlp");
+                
+                try {
+                    android.content.pm.PackageManager pm = getPackageManager();
+                    pm.getPackageInfo("com.termux", 0);
+                    // Termux is installed
+                    Log.i(TAG, "Termux detected!");
+                    
+                    // Check for yt-dlp in Termux
+                    File termuxYtDlp = new File("/data/data/com.termux/files/usr/bin/yt-dlp");
+                    if (termuxYtDlp.exists()) {
+                        ytdlpPath = termuxYtDlp.getAbsolutePath();
+                        Log.i(TAG, "Using Termux yt-dlp: " + ytdlpPath);
+                    } else {
+                        // Try native libytdlp.so as fallback
+                        File nativeYtDlp = new File(nativeDir, "libytdlp.so");
+                        if (nativeYtDlp.exists()) {
+                            ytdlpPath = nativeYtDlp.getAbsolutePath();
+                            Log.i(TAG, "Using native yt-dlp: " + ytdlpPath);
+                        } else {
+                            showError("yt-dlp not found. Please run in Termux: pkg install yt-dlp");
+                            return;
+                        }
+                    }
+                } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                    // Termux not installed, use native
+                    File nativeYtDlp = new File(nativeDir, "libytdlp.so");
+                    if (!nativeYtDlp.exists()) {
+                        showError("yt-dlp not found. Please install Termux and run: pkg install yt-dlp");
                         return;
                     }
-                    Log.i(TAG, "Using Termux Python + native yt-dlp");
-                } else {
-                    // Fallback to libytdlp.so
-                    if (!ytdlpFile.exists()) {
-                        showError("yt-dlp not found. Please install Termux and run: pkg install python yt-dlp");
-                        return;
-                    }
-                    ytdlpPath = ytdlpFile.getAbsolutePath();
-                    Log.i(TAG, "yt-dlp: " + ytdlpPath);
+                    ytdlpPath = nativeYtDlp.getAbsolutePath();
+                    Log.i(TAG, "Using native yt-dlp: " + ytdlpPath);
                 }
 
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
