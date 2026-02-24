@@ -41,20 +41,23 @@ public class MainActivity extends Activity {
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
 
-                // Check for Termux using package manager (works through Android sandbox)
+                // Check for Termux using package manager
                 String ytdlpPath;
-                String pythonPath = "";
-                String usePython = "false";
                 
                 android.content.pm.PackageManager pm = getPackageManager();
                 boolean termuxInstalled = false;
-                try {
-                    pm.getPackageInfo("com.termux", 0);
-                    termuxInstalled = true;
-                    Log.i(TAG, "Termux package found!");
-                } catch (Exception e) {
-                    Log.i(TAG, "Termux not found: " + e.getMessage());
-                    termuxInstalled = false;
+                
+                // Try both package names (some devices use different case)
+                String[] termuxPackages = {"com.termux", "com.termux.app"};
+                for (String pkg : termuxPackages) {
+                    try {
+                        pm.getPackageInfo(pkg, 0);
+                        termuxInstalled = true;
+                        Log.i(TAG, "Found Termux package: " + pkg);
+                        break;
+                    } catch (Exception e) {
+                        // Continue to next package name
+                    }
                 }
                 
                 if (termuxInstalled) {
