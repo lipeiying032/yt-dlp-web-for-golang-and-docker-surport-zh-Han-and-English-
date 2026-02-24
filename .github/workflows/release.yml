@@ -123,6 +123,7 @@ jobs:
           GOARCH: arm64
         run: |
           go mod tidy
+          sudo apt-get update && sudo apt-get install -y xz-utils
           
           # Only arm64-v8a
           JNILIBS="android/app/src/main/jniLibs/arm64-v8a"
