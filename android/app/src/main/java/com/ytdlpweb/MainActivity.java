@@ -41,46 +41,31 @@ public class MainActivity extends Activity {
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
 
-                // Check for bundled Python and yt-dlp in assets
+                // Check for bundled yt-dlp in assets
                 File filesDir = getFilesDir();
-                File pythonDir = new File(filesDir, "assets");
-                File pythonFile = null;
-                File ytdlpFile = null;
+                File assetsDir = new File(filesDir, "assets");
+                File ytdlpFile = new File(assetsDir, "yt-dlp");
 
-                // Extract Python if exists in assets
-                String[] assets = getAssets().list("");
-                for (String a : assets) {
-                    if (a.equals("python3") || a.startsWith("python3.")) {
-                        pythonFile = new File(pythonDir, "python3");
-                        if (!pythonFile.exists()) {
-                            getAssets().copyAsset(a, pythonFile);
-                            pythonFile.setExecutable(true, false);
+                // Extract yt-dlp from assets
+                try {
+                    String[] assets = getAssets().list("");
+                    for (String a : assets) {
+                        if (a.equals("yt-dlp")) {
+                            if (!ytdlpFile.exists()) {
+                                getAssets().copyAsset(a, ytdlpFile);
+                                ytdlpFile.setExecutable(true, false);
+                            }
+                            break;
                         }
-                        break;
                     }
-                }
-
-                // Extract yt-dlp
-                for (String a : assets) {
-                    if (a.equals("yt-dlp")) {
-                        ytdlpFile = new File(pythonDir, "yt-dlp");
-                        if (!ytdlpFile.exists()) {
-                            getAssets().copyAsset(a, ytdlpFile);
-                            ytdlpFile.setExecutable(true, false);
-                        }
-                        break;
-                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to extract yt-dlp: " + e.getMessage());
                 }
 
                 String ytdlpPath = "";
-                String pythonPath = "";
-                String usePython = "false";
-
-                if (pythonFile != null && pythonFile.exists() && ytdlpFile != null && ytdlpFile.exists()) {
-                    pythonPath = pythonFile.getAbsolutePath();
+                if (ytdlpFile.exists()) {
                     ytdlpPath = ytdlpFile.getAbsolutePath();
-                    usePython = "true";
-                    Log.i(TAG, "Using bundled Python + yt-dlp: " + pythonPath + " " + ytdlpPath);
+                    Log.i(TAG, "Using bundled yt-dlp: " + ytdlpPath);
                 } else {
                     // Fallback to native libytdlp.so
                     ytdlpFile = new File(nativeDir, "libytdlp.so");
@@ -105,10 +90,6 @@ public class MainActivity extends Activity {
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
                 pb.environment().put("YTDLP_PATH", ytdlpPath);
-                if (usePython.equals("true")) {
-                    pb.environment().put("PYTHON_PATH", pythonPath);
-                    pb.environment().put("USE_PYTHON", usePython);
-                }
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
