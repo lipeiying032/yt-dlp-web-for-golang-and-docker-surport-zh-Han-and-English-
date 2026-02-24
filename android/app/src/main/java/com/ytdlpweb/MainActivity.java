@@ -33,19 +33,26 @@ public class MainActivity extends Activity {
             try {
                 String nativeDir = getApplicationInfo().nativeLibraryDir;
                 File serverFile = new File(nativeDir, "libytdlpweb.so");
-                File ytdlpFile = new File(nativeDir, "libytdlp.so");
 
                 if (!serverFile.exists()) {
                     showError("Server not found: " + serverFile.getAbsolutePath());
                     return;
                 }
-                if (!ytdlpFile.exists()) {
-                    showError("yt-dlp binary not found. Note: On Android, please use Termux to download videos manually:\n1. Install Termux from app store\n2. Run: pkg install python yt-dlp\n3. In Termux: yt-dlp [URL]");
-                    return;
-                }
 
                 Log.i(TAG, "Server: " + serverFile.getAbsolutePath());
-                Log.i(TAG, "yt-dlp: " + ytdlpFile.getAbsolutePath());
+
+                // Check if Termux is installed
+                boolean termuxInstalled = false;
+                try {
+                    getPackageManager().getPackageInfo("com.termux", 0);
+                    termuxInstalled = true;
+                    Log.i(TAG, "Termux is installed");
+                } catch (Exception e) {
+                    Log.i(TAG, "Termux not found");
+                }
+
+                // Use Termux Intent for downloads
+                String useTermuxIntent = termuxInstalled ? "true" : "false";
 
                 File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                 File ytdlpDownloadDir = new File(downloadDir, "yt-dlp-web");
@@ -59,7 +66,7 @@ public class MainActivity extends Activity {
                 pb.environment().put("DOWNLOAD_DIR", ytdlpDownloadDir.getAbsolutePath());
                 pb.environment().put("CONFIG_DIR", configDir);
                 pb.environment().put("STATIC_DIR", "");
-                pb.environment().put("YTDLP_PATH", ytdlpFile.getAbsolutePath());
+                pb.environment().put("USE_TERMUX_INTENT", useTermuxIntent);
                 pb.directory(getFilesDir());
                 pb.redirectErrorStream(true);
 
